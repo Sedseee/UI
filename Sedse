@@ -1,6 +1,6 @@
 --[[ 
-    SYNQ UI LIBRARY
-    A futuristic, dark-themed UI library matching the exact style requested.
+    SYNQ UI LIBRARY - FULL VERSION (V2 - FIXED SCALING & SIZING)
+    Fully featured, futuristic UI library matching the SYNQ reference image.
 ]]
 
 local uis = game:GetService("UserInputService") 
@@ -17,9 +17,8 @@ local function get_ui_parent()
 end
 
 local library = {
-    -- Roboto Mono matches the crisp, technical font seen in the image
-    font = Font.new("rbxassetid://11702779409", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
-    bold_font = Font.new("rbxassetid://11702779409", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+    font = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+    bold_font = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
 }
 library.__index = library
 
@@ -52,18 +51,18 @@ local dim = UDim.new
 local rgb = Color3.fromRGB
 local ui_parent = get_ui_parent()
 
--- Palette matching the SYNQ reference image
+-- Brightened Theme so it doesn't appear pitch black
 local Theme = {
-    MainBG = rgb(10, 10, 10),
-    SidebarBG = rgb(12, 12, 12),
-    TopbarBG = rgb(10, 10, 10),
-    SectionBG = rgb(15, 15, 15),
-    ElementBG = rgb(15, 15, 15),
-    HoverBG = rgb(22, 22, 22),
-    Accent = rgb(255, 60, 45), -- Vibrant orange/red
-    Text = rgb(220, 220, 220),
-    MutedText = rgb(110, 110, 110),
-    Outline = rgb(30, 30, 30)
+    MainBG = rgb(14, 14, 14),
+    SidebarBG = rgb(10, 10, 10),
+    TopbarBG = rgb(14, 14, 14),
+    SectionBG = rgb(18, 18, 18),
+    ElementBG = rgb(24, 24, 24),
+    HoverBG = rgb(32, 32, 32),
+    Accent = rgb(255, 65, 50), -- Synq Orange/Red
+    Text = rgb(230, 230, 230),
+    MutedText = rgb(130, 130, 130),
+    Outline = rgb(35, 35, 35)
 }
 
 function library:tween(obj, props, time) 
@@ -101,9 +100,7 @@ local notif_screen = library:create("ScreenGui", {Parent = ui_parent, Name = "Sy
 local notif_container = library:create("Frame", {
     Parent = notif_screen, Size = dim2(0, 300, 1, 0), Position = dim2(1, -310, 0, 0), BackgroundTransparency = 1
 })
-library:create("UIListLayout", {
-    Parent = notif_container, Padding = dim(0, 10), VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right
-})
+library:create("UIListLayout", { Parent = notif_container, Padding = dim(0, 10), VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right })
 library:create("UIPadding", {Parent = notif_container, PaddingBottom = dim(0, 20), PaddingRight = dim(0, 10)})
 
 -- Lucide Icons Logic
@@ -120,9 +117,7 @@ local function get_icon(iconName, color)
     local isAsset = iconName:match("^rbxassetid://") or iconName:match("^%d+$")
     if isAsset then
         local img = Instance.new("ImageLabel")
-        img.BackgroundTransparency = 1
-        img.Image = iconName:match("^%d+$") and "rbxassetid://"..iconName or iconName
-        img.ImageColor3 = color or Color3.fromRGB(255, 255, 255)
+        img.BackgroundTransparency = 1; img.Image = iconName:match("^%d+$") and "rbxassetid://"..iconName or iconName; img.ImageColor3 = color or Color3.fromRGB(255, 255, 255)
         return img
     end
     local holder = Instance.new("Frame")
@@ -134,10 +129,12 @@ local function get_icon(iconName, color)
             local iconStr = iconName:gsub("^lucide:", "")
             local ok, iconObj = pcall(function() return Icons.Image({ Icon = iconStr, Colors = {color or Color3.fromRGB(255, 255, 255)} }) end)
             if ok and iconObj and iconObj.IconFrame then
-                iconObj.IconFrame.BackgroundTransparency = 1
-                iconObj.IconFrame.Size = UDim2.new(1, 0, 1, 0)
-                iconObj.IconFrame.Parent = holder
+                iconObj.IconFrame.BackgroundTransparency = 1; iconObj.IconFrame.Size = UDim2.new(1, 0, 1, 0); iconObj.IconFrame.Parent = holder
             end
+        else
+            -- Fallback if raw.github fails
+            local img = Instance.new("ImageLabel")
+            img.BackgroundTransparency = 1; img.Image = "rbxassetid://13112879555"; img.ImageColor3 = color or Color3.fromRGB(255, 255, 255); img.Size = UDim2.new(1,0,1,0); img.Parent = holder
         end
     end)
     return holder
@@ -145,25 +142,17 @@ end
 
 local function color_icon(iconInstance, color)
     if not iconInstance then return end
-    for _, v in pairs(iconInstance:GetDescendants()) do
-        if v:IsA("ImageLabel") then
-            tween_service:Create(v, TweenInfo.new(0.15), {ImageColor3 = color}):Play()
-        end
-    end
+    for _, v in pairs(iconInstance:GetDescendants()) do if v:IsA("ImageLabel") then library:tween(v, {ImageColor3 = color}, 0.15) end end
 end
 
--- Helper to stack Title & Description
 local function CreateTitleAndDesc(parent, name, desc)
     local holder = library:create("Frame", { Parent = parent, Size = dim2(1, -50, 1, 0), BackgroundTransparency = 1 })
     library:create("UIListLayout", { Parent = holder, Padding = dim(0, 2), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center })
-    local title = library:create("TextLabel", { Parent = holder, Size = dim2(1, 0, 0, 14), BackgroundTransparency = 1, Text = name or "Element", TextColor3 = Theme.Text, FontFace = library.font, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left })
-    if desc then
-        library:create("TextLabel", { Parent = holder, Size = dim2(1, 0, 0, 12), BackgroundTransparency = 1, Text = desc, TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left })
-    end
+    library:create("TextLabel", { Parent = holder, Size = dim2(1, 0, 0, 14), BackgroundTransparency = 1, Text = name or "Element", TextColor3 = Theme.Text, FontFace = library.font, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left })
+    if desc then library:create("TextLabel", { Parent = holder, Size = dim2(1, 0, 0, 12), BackgroundTransparency = 1, Text = desc, TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }) end
     return holder
 end
 
--- UI Constructor
 function library:window(props)
     local win = { items = {}, tabs = {}, _toggleRegistry = {}, _elementRegistry = {}, _tabOrder = 0 }
 
@@ -175,17 +164,18 @@ function library:window(props)
 
     local screen = library:create("ScreenGui", {Parent = ui_parent, Name = "SynqUI", ResetOnSpawn = false})
     
+    -- Compact sizing to fit elements gracefully
     local main = library:create("Frame", {
-        Parent = screen, Size = dim2(0, 800, 0, 520), Position = dim2(0.5, -400, 0.5, -260),
+        Parent = screen, Size = dim2(0, 750, 0, 480), Position = dim2(0.5, -375, 0.5, -240),
         BackgroundColor3 = Theme.MainBG, BorderSizePixel = 0
     })
     library:create("UICorner", {Parent = main, CornerRadius = dim(0, 6)})
     library:create("UIStroke", {Parent = main, Color = Theme.Outline, Thickness = 1})
 
-    local topbar = library:create("Frame", { Parent = main, Size = dim2(1, 0, 0, 30), BackgroundTransparency = 1 })
+    local topbar = library:create("Frame", { Parent = main, Size = dim2(1, 0, 0, 35), BackgroundTransparency = 1 })
     library:draggify(main, topbar)
 
-    local minBtn = library:create("TextButton", { Parent = topbar, Size = dim2(0, 24, 0, 24), Position = dim2(1, -60, 0.5, -12), BackgroundTransparency = 1, Text = "-", TextColor3 = Theme.MutedText, TextSize = 16, FontFace = library.font, AutoButtonColor = false })
+    local minBtn = library:create("TextButton", { Parent = topbar, Size = dim2(0, 24, 0, 24), Position = dim2(1, -60, 0.5, -12), BackgroundTransparency = 1, Text = "-", TextColor3 = Theme.MutedText, TextSize = 18, FontFace = library.font, AutoButtonColor = false })
     local closeBtn = library:create("TextButton", { Parent = topbar, Size = dim2(0, 24, 0, 24), Position = dim2(1, -30, 0.5, -12), BackgroundTransparency = 1, Text = "X", TextColor3 = Theme.MutedText, TextSize = 14, FontFace = library.font, AutoButtonColor = false })
     
     closeBtn.MouseEnter:Connect(function() library:tween(closeBtn, {TextColor3 = Theme.Accent}, 0.15) end)
@@ -195,32 +185,31 @@ function library:window(props)
     minBtn.MouseLeave:Connect(function() library:tween(minBtn, {TextColor3 = Theme.MutedText}, 0.15) end)
 
     local sidebar = library:create("Frame", {
-        Parent = main, Size = dim2(0, 85, 1, 0), BackgroundColor3 = Theme.SidebarBG, BorderSizePixel = 0, ZIndex = 2
+        Parent = main, Size = dim2(0, 90, 1, 0), BackgroundColor3 = Theme.SidebarBG, BorderSizePixel = 0, ZIndex = 2
     })
     library:create("UICorner", {Parent = sidebar, CornerRadius = dim(0, 6)})
-    library:create("Frame", {Parent = sidebar, Size = dim2(0, 6, 1, 0), Position = dim2(1, -6, 0, 0), BackgroundColor3 = Theme.SidebarBG, BorderSizePixel = 0}) -- Fill right corner
+    library:create("Frame", {Parent = sidebar, Size = dim2(0, 6, 1, 0), Position = dim2(1, -6, 0, 0), BackgroundColor3 = Theme.SidebarBG, BorderSizePixel = 0})
 
     local logo = library:create("TextLabel", {
-        Parent = sidebar, Size = dim2(1, 0, 0, 60), Position = dim2(0, 0, 0, 10), BackgroundTransparency = 1,
-        Text = "S Y N Q", TextColor3 = Theme.Accent, FontFace = library.bold_font, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center
+        Parent = sidebar, Size = dim2(1, 0, 0, 60), Position = dim2(0, 0, 0, 5), BackgroundTransparency = 1,
+        Text = "S Y N Q", TextColor3 = Theme.Accent, FontFace = library.bold_font, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center
     })
 
     local tab_container = library:create("ScrollingFrame", {
-        Parent = sidebar, Position = dim2(0, 0, 0, 70), Size = dim2(1, 0, 1, -70),
+        Parent = sidebar, Position = dim2(0, 0, 0, 65), Size = dim2(1, 0, 1, -65),
         BackgroundTransparency = 1, ScrollBarThickness = 0, CanvasSize = dim2(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y
     })
     library:create("UIListLayout", {Parent = tab_container, Padding = dim(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder})
 
-    local page_holder = library:create("Frame", { Parent = main, Position = dim2(0, 95, 0, 40), Size = dim2(1, -105, 1, -50), BackgroundTransparency = 1 })
+    local page_holder = library:create("Frame", { Parent = main, Position = dim2(0, 95, 0, 40), Size = dim2(1, -100, 1, -45), BackgroundTransparency = 1 })
 
     local isMinimized = false
     local savedSize = main.Size
     minBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         if isMinimized then
-            savedSize = main.Size
-            sidebar.Visible = false; page_holder.Visible = false
-            library:tween(main, {Size = dim2(0, savedSize.X.Offset, 0, 30)}, 0.25)
+            savedSize = main.Size; sidebar.Visible = false; page_holder.Visible = false
+            library:tween(main, {Size = dim2(0, savedSize.X.Offset, 0, 35)}, 0.25)
         else
             local t = library:tween(main, {Size = savedSize}, 0.25)
             t.Completed:Connect(function() if not isMinimized then sidebar.Visible = true; page_holder.Visible = true end end)
@@ -231,9 +220,7 @@ function library:window(props)
         local state = (type(a) == "boolean") and a or b; if state == nil then state = not main.Visible end; main.Visible = state
     end
     local toggleKey = Enum.KeyCode.RightControl
-    track_connection(uis.InputBegan:Connect(function(input, gpe)
-        if not gpe and input.KeyCode == toggleKey then win.toggle_menu() end
-    end))
+    track_connection(uis.InputBegan:Connect(function(input, gpe) if not gpe and input.KeyCode == toggleKey then win.toggle_menu() end end))
 
     function win:Tab(props)
         local tab = { name = props.name or props.Name or "Tab" }
@@ -245,16 +232,23 @@ function library:window(props)
         if tIcon then tIcon.Size = dim2(0, 20, 0, 20); tIcon.Position = dim2(0.5, 0, 0, 10); tIcon.AnchorPoint = Vector2.new(0.5, 0); tIcon.Parent = btn end
         
         local tLabel = library:create("TextLabel", { Parent = btn, Text = string.lower(tab.name), Size = dim2(1, 0, 0, 14), Position = dim2(0, 0, 1, -16), BackgroundTransparency = 1, TextColor3 = Theme.MutedText, TextXAlignment = Enum.TextXAlignment.Center, FontFace = library.font, TextSize = 10 })
-        
         local indicator = library:create("Frame", { Parent = btn, Size = dim2(0, 2, 0, 24), Position = dim2(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = Theme.Accent, BackgroundTransparency = 1, BorderSizePixel = 0 })
 
-        local page = library:create("ScrollingFrame", { Parent = page_holder, Size = dim2(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, ScrollBarThickness = 2, ScrollBarImageColor3 = Theme.Outline, AutomaticCanvasSize = Enum.AutomaticSize.Y })
-        library:create("UIListLayout", {Parent = page, FillDirection = Enum.FillDirection.Horizontal, Padding = dim(0, 15), SortOrder = Enum.SortOrder.LayoutOrder})
+        -- THE FIX: Setting CanvasSize properly so Children don't collapse
+        local page = library:create("ScrollingFrame", { 
+            Parent = page_holder, Size = dim2(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, 
+            ScrollBarThickness = 2, ScrollBarImageColor3 = Theme.Outline, CanvasSize = dim2(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y 
+        })
+        library:create("UIPadding", {Parent = page, PaddingLeft = dim(0, 10), PaddingRight = dim(0, 10), PaddingTop = dim(0, 5), PaddingBottom = dim(0, 10)})
         
-        local left_col = library:create("Frame", { Parent = page, Size = dim2(0.5, -8, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
-        library:create("UIListLayout", {Parent = left_col, Padding = dim(0, 15)})
-        local right_col = library:create("Frame", { Parent = page, Size = dim2(0.5, -8, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
-        library:create("UIListLayout", {Parent = right_col, Padding = dim(0, 15)})
+        -- THE FIX: Adding a Content frame to hold columns so UIListLayout scales properly
+        local content = library:create("Frame", { Parent = page, Size = dim2(1, 0, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
+
+        local left_col = library:create("Frame", { Parent = content, Size = dim2(0.5, -5, 0, 0), Position = dim2(0, 0, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
+        library:create("UIListLayout", {Parent = left_col, Padding = dim(0, 12)})
+        
+        local right_col = library:create("Frame", { Parent = content, Size = dim2(0.5, -5, 0, 0), Position = dim2(0.5, 5, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
+        library:create("UIListLayout", {Parent = right_col, Padding = dim(0, 12)})
 
         if #win.tabs == 0 and not props._noAutoSelect then
             page.Visible = true; tLabel.TextColor3 = Theme.Accent; color_icon(tIcon, Theme.Accent); indicator.BackgroundTransparency = 0
@@ -262,12 +256,8 @@ function library:window(props)
         table.insert(win.tabs, {btn = btn, page = page, label = tLabel, icon = tIcon, indicator = indicator})
 
         btn.MouseButton1Click:Connect(function()
-            for _, t in pairs(win.tabs) do 
-                t.page.Visible = false; t.label.TextColor3 = Theme.MutedText; color_icon(t.icon, Theme.MutedText)
-                library:tween(t.indicator, {BackgroundTransparency = 1}, 0.15)
-            end
-            page.Visible = true; tLabel.TextColor3 = Theme.Accent; color_icon(tIcon, Theme.Accent)
-            library:tween(indicator, {BackgroundTransparency = 0}, 0.15)
+            for _, t in pairs(win.tabs) do t.page.Visible = false; t.label.TextColor3 = Theme.MutedText; color_icon(t.icon, Theme.MutedText); library:tween(t.indicator, {BackgroundTransparency = 1}, 0.15) end
+            page.Visible = true; tLabel.TextColor3 = Theme.Accent; color_icon(tIcon, Theme.Accent); library:tween(indicator, {BackgroundTransparency = 0}, 0.15)
         end)
 
         local section_api = {}
@@ -283,9 +273,9 @@ function library:window(props)
         end
 
         function section_api:Button(p)
-            local b = library:create("TextButton", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, 32), BackgroundColor3 = Theme.MainBG, Text = p.name or p.Name or "Button", TextColor3 = Theme.Text, FontFace = library.font, TextSize = 12, AutoButtonColor = false })
+            local b = library:create("TextButton", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, 30), BackgroundColor3 = Theme.ElementBG, Text = p.name or p.Name or "Button", TextColor3 = Theme.Text, FontFace = library.font, TextSize = 12, AutoButtonColor = false })
             library:create("UICorner", {Parent = b, CornerRadius = dim(0, 4)}); library:create("UIStroke", {Parent = b, Color = Theme.Outline, Thickness = 1})
-            b.MouseButton1Click:Connect(function() library:tween(b, {BackgroundColor3 = Theme.HoverBG}, 0.1); task.wait(0.1); library:tween(b, {BackgroundColor3 = Theme.MainBG}, 0.1); if p.Callback then p.Callback() end end)
+            b.MouseButton1Click:Connect(function() library:tween(b, {BackgroundColor3 = Theme.HoverBG}, 0.1); task.wait(0.1); library:tween(b, {BackgroundColor3 = Theme.ElementBG}, 0.1); if p.Callback then p.Callback() end end)
             return {}
         end
 
@@ -293,25 +283,24 @@ function library:window(props)
             local tog = { enabled = p.default or false }
             local height = p.desc and 38 or 24
             local holder = library:create("Frame", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, height), BackgroundTransparency = 1 })
-            
             CreateTitleAndDesc(holder, p.name or p.Name, p.desc or p.Desc)
             
             local btn = library:create("TextButton", { Parent = holder, Size = dim2(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", ZIndex = 2 })
-            local bg = library:create("Frame", { Parent = holder, Size = dim2(0, 32, 0, 16), Position = dim2(1, -32, 0.5, -8), BackgroundColor3 = tog.enabled and Theme.Accent or Theme.MainBG })
+            local bg = library:create("Frame", { Parent = holder, Size = dim2(0, 32, 0, 16), Position = dim2(1, -32, 0.5, -8), BackgroundColor3 = tog.enabled and Theme.Accent or Theme.ElementBG })
             library:create("UICorner", {Parent = bg, CornerRadius = dim(1, 0)}); library:create("UIStroke", {Parent = bg, Color = Theme.Outline, Thickness = 1})
             
             local circ = library:create("Frame", { Parent = bg, Size = dim2(0, 12, 0, 12), Position = dim2(tog.enabled and 1 or 0, tog.enabled and -14 or 2, 0.5, -6), BackgroundColor3 = rgb(255, 255, 255), BorderSizePixel = 0 })
             library:create("UICorner", {Parent = circ, CornerRadius = dim(1, 0)})
 
             local function Update()
-                library:tween(bg, {BackgroundColor3 = tog.enabled and Theme.Accent or Theme.MainBG}, 0.2)
+                library:tween(bg, {BackgroundColor3 = tog.enabled and Theme.Accent or Theme.ElementBG}, 0.2)
                 library:tween(circ, {Position = dim2(tog.enabled and 1 or 0, tog.enabled and -14 or 2, 0.5, -6)}, 0.2)
                 if p.Callback then p.Callback(tog.enabled) end
             end
 
             btn.MouseButton1Click:Connect(function() tog.enabled = not tog.enabled; Update() end)
-            
             function tog:set(state) tog.enabled = state; Update() end
+            
             win._elementRegistry[p.name or p.Name or "Toggle"] = tog
             table.insert(win._toggleRegistry, { name = p.name or p.Name or "Toggle", api = tog })
             if win.RefreshMobileList then win:RefreshMobileList() end
@@ -323,29 +312,23 @@ function library:window(props)
             local decimals = p.decimals or 0 
             local formatStr = "%."..decimals.."f" .. (p.suffix and " " .. p.suffix or "")
             
-            local height = (p.desc and 45 or 35)
+            local height = (p.desc and 42 or 30)
             local s = library:create("Frame", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, height), BackgroundTransparency = 1 })
-            
             CreateTitleAndDesc(s, p.name or p.Name, p.desc or p.Desc)
             
             local val_lbl = library:create("TextLabel", { Parent = s, Text = string.format(formatStr, default), Size = dim2(0, 100, 0, 14), Position = dim2(1, -100, 0, 0), BackgroundTransparency = 1, TextColor3 = Theme.Accent, TextXAlignment = Enum.TextXAlignment.Right, FontFace = library.font, TextSize = 11 })
-            
-            local bar_bg = library:create("Frame", { Parent = s, Size = dim2(1, 0, 0, 4), Position = dim2(0, 0, 1, -4), BackgroundColor3 = Theme.Outline, BorderSizePixel = 0 })
+            local bar_bg = library:create("Frame", { Parent = s, Size = dim2(1, 0, 0, 4), Position = dim2(0, 0, 1, -4), BackgroundColor3 = Theme.ElementBG, BorderSizePixel = 0 })
             library:create("UICorner", {Parent = bar_bg, CornerRadius = dim(1, 0)})
-            
             local fill = library:create("Frame", { Parent = bar_bg, Size = dim2((default - min)/(max - min), 0, 1, 0), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0 })
             library:create("UICorner", {Parent = fill, CornerRadius = dim(1, 0)})
-            
             local thumb = library:create("Frame", { Parent = fill, Size = dim2(0, 10, 0, 10), Position = dim2(1, -5, 0.5, -5), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0 })
             library:create("UICorner", {Parent = thumb, CornerRadius = dim(1, 0)})
             
             local dragging = false
-            
             local function update_slider(input_x)
                 local pct = math.clamp((input_x - bar_bg.AbsolutePosition.X) / bar_bg.AbsoluteSize.X, 0, 1)
                 local value = min + ((max - min) * pct) 
-                fill.Size = dim2(pct, 0, 1, 0)
-                val_lbl.Text = string.format(formatStr, value)
+                fill.Size = dim2(pct, 0, 1, 0); val_lbl.Text = string.format(formatStr, value)
                 if p.Callback then p.Callback(value) end
             end
 
@@ -354,14 +337,7 @@ function library:window(props)
             track_connection(uis.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end end))
             track_connection(uis.InputChanged:Connect(function(i) if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then update_slider(i.Position.X) end end))
 
-            local api = {
-                set = function(self, val)
-                    val = math.clamp(val, min, max)
-                    fill.Size = dim2((val - min) / (max - min), 0, 1, 0)
-                    val_lbl.Text = string.format(formatStr, val)
-                    if p.Callback then p.Callback(val) end
-                end
-            }
+            local api = { set = function(self, val) val = math.clamp(val, min, max); fill.Size = dim2((val - min) / (max - min), 0, 1, 0); val_lbl.Text = string.format(formatStr, val); if p.Callback then p.Callback(val) end end }
             win._elementRegistry[p.name or p.Name or "Slider"] = api
             return api
         end
@@ -370,16 +346,14 @@ function library:window(props)
             local isMulti = p.multi or p.Multi
             local selected = isMulti and (p.default or {}) or (p.default or (p.items and p.items[1]) or "None")
             local open = false
-            
             local holder = library:create("Frame", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
             library:create("UIListLayout", {Parent = holder, Padding = dim(0, 6), SortOrder = Enum.SortOrder.LayoutOrder})
             
-            local topArea = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, p.desc and 30 or 16), BackgroundTransparency = 1 })
+            local topArea = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, p.desc and 28 or 14), BackgroundTransparency = 1 })
             CreateTitleAndDesc(topArea, p.Name or p.name, p.desc or p.Desc)
             
             local function get_val_str() return isMulti and (#selected > 0 and table.concat(selected, ", ") or "None") or selected end
-            
-            local btn = library:create("TextButton", { Parent = holder, Size = dim2(1, 0, 0, 26), BackgroundColor3 = Theme.MainBG, Text = "  " .. get_val_str(), TextColor3 = Theme.Text, TextXAlignment = Enum.TextXAlignment.Left, FontFace = library.font, TextSize = 11, AutoButtonColor=false })
+            local btn = library:create("TextButton", { Parent = holder, Size = dim2(1, 0, 0, 26), BackgroundColor3 = Theme.ElementBG, Text = "  " .. get_val_str(), TextColor3 = Theme.Text, TextXAlignment = Enum.TextXAlignment.Left, FontFace = library.font, TextSize = 11, AutoButtonColor=false })
             library:create("UICorner", {Parent = btn, CornerRadius = dim(0, 4)}); library:create("UIStroke", {Parent = btn, Color = Theme.Outline, Thickness = 1})
             
             local icon = get_icon("lucide:chevron-down", Theme.MutedText)
@@ -389,11 +363,10 @@ function library:window(props)
             library:create("UIListLayout", {Parent = container, Padding = dim(0, 4), SortOrder = Enum.SortOrder.LayoutOrder})
             
             local itemBtns = {}
-            
             local function updateItems()
                 for _, iBtn in pairs(itemBtns) do
                     local isSel = isMulti and table.find(selected, iBtn.name) or (selected == iBtn.name)
-                    iBtn.btn.BackgroundColor3 = isSel and Theme.HoverBG or Theme.MainBG
+                    iBtn.btn.BackgroundColor3 = isSel and Theme.HoverBG or Theme.ElementBG
                     iBtn.btn.TextColor3 = isSel and Theme.Accent or Theme.MutedText
                 end
                 btn.Text = "  " .. get_val_str()
@@ -401,31 +374,21 @@ function library:window(props)
             
             btn.MouseButton1Click:Connect(function() 
                 open = not open; container.Visible = open 
-                if icon then
-                    icon:Destroy()
-                    icon = get_icon(open and "lucide:chevron-up" or "lucide:chevron-down", Theme.MutedText)
-                    icon.Size = dim2(0, 14, 0, 14); icon.Position = dim2(1, -20, 0.5, 0); icon.AnchorPoint = Vector2.new(0, 0.5); icon.Parent = btn
-                end
+                if icon then icon:Destroy(); icon = get_icon(open and "lucide:chevron-up" or "lucide:chevron-down", Theme.MutedText); icon.Size = dim2(0, 14, 0, 14); icon.Position = dim2(1, -20, 0.5, 0); icon.AnchorPoint = Vector2.new(0, 0.5); icon.Parent = btn end
             end)
             
             local function build_items(itemList)
-                for _, iBtn in pairs(itemBtns) do iBtn.btn:Destroy() end
-                itemBtns = {}
-                if not isMulti and not table.find(itemList, selected) then 
-                    selected = itemList[1] or "None"; if p.Callback then p.Callback(selected) end
-                end
+                for _, iBtn in pairs(itemBtns) do iBtn.btn:Destroy() end; itemBtns = {}
+                if not isMulti and not table.find(itemList, selected) then selected = itemList[1] or "None"; if p.Callback then p.Callback(selected) end end
                 for index, item in pairs(itemList or {}) do
-                    local ibtn = library:create("TextButton", { Parent = container, LayoutOrder = index, Size = dim2(1, 0, 0, 24), BackgroundColor3 = Theme.MainBG, Text = "  " .. item, TextColor3 = Theme.MutedText, TextXAlignment = Enum.TextXAlignment.Left, FontFace = library.font, TextSize = 11, AutoButtonColor = false })
+                    local ibtn = library:create("TextButton", { Parent = container, LayoutOrder = index, Size = dim2(1, 0, 0, 24), BackgroundColor3 = Theme.ElementBG, Text = "  " .. item, TextColor3 = Theme.MutedText, TextXAlignment = Enum.TextXAlignment.Left, FontFace = library.font, TextSize = 11, AutoButtonColor = false })
                     library:create("UICorner", {Parent = ibtn, CornerRadius = dim(0, 4)}); table.insert(itemBtns, {btn = ibtn, name = item})
                     ibtn.MouseButton1Click:Connect(function()
                         if isMulti then 
                             local idx = table.find(selected, item); if idx then table.remove(selected, idx) else table.insert(selected, item) end 
                         else 
                             selected = item; open = false; container.Visible = false 
-                            if icon then
-                                icon:Destroy(); icon = get_icon("lucide:chevron-down", Theme.MutedText)
-                                icon.Size = dim2(0, 14, 0, 14); icon.Position = dim2(1, -20, 0.5, 0); icon.AnchorPoint = Vector2.new(0, 0.5); icon.Parent = btn
-                            end
+                            if icon then icon:Destroy(); icon = get_icon("lucide:chevron-down", Theme.MutedText); icon.Size = dim2(0, 14, 0, 14); icon.Position = dim2(1, -20, 0.5, 0); icon.AnchorPoint = Vector2.new(0, 0.5); icon.Parent = btn end
                         end
                         updateItems(); if p.Callback then p.Callback(selected) end
                     end)
@@ -435,12 +398,7 @@ function library:window(props)
 
             build_items(p.items or {})
             
-            local api = {
-                set_items = function(self, new_items) build_items(new_items) end,
-                set_value = function(self, val) selected = val; updateItems(); if p.Callback then p.Callback(selected) end end,
-                set = function(self, val) self:set_value(val) end,
-                get_value = function(self) return selected end
-            }
+            local api = { set_items = function(self, new_items) build_items(new_items) end, set_value = function(self, val) selected = val; updateItems(); if p.Callback then p.Callback(selected) end end, set = function(self, val) self:set_value(val) end, get_value = function(self) return selected end }
             win._elementRegistry[p.Name or p.name or "Dropdown"] = api
             return api
         end
@@ -448,10 +406,10 @@ function library:window(props)
         function section_api:Textbox(p)
             local holder = library:create("Frame", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
             library:create("UIListLayout", {Parent = holder, Padding = dim(0, 6), SortOrder = Enum.SortOrder.LayoutOrder})
-            local topArea = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, p.desc and 30 or 16), BackgroundTransparency = 1 })
+            local topArea = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, p.desc and 28 or 14), BackgroundTransparency = 1 })
             CreateTitleAndDesc(topArea, p.Name or p.name, p.desc or p.Desc)
             
-            local bg = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, 26), BackgroundColor3 = Theme.MainBG })
+            local bg = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, 26), BackgroundColor3 = Theme.ElementBG })
             library:create("UICorner", {Parent = bg, CornerRadius = dim(0, 4)}); library:create("UIStroke", {Parent = bg, Color = Theme.Outline, Thickness = 1})
             local box = library:create("TextBox", { Parent = bg, Size = dim2(1, -16, 1, 0), Position = dim2(0, 8, 0, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = p.placeholder or p.Placeholder or "...", TextColor3 = Theme.Text, PlaceholderColor3 = Theme.MutedText, FontFace = library.font, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left })
             box.FocusLost:Connect(function() if p.Callback then p.Callback(box.Text) end end)
@@ -467,15 +425,14 @@ function library:window(props)
             local holder = library:create("Frame", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, height), BackgroundTransparency = 1 })
             CreateTitleAndDesc(holder, p.name or p.Name, p.desc or p.Desc)
             
-            local btn = library:create("TextButton", { Parent = holder, Size = dim2(0, 40, 0, 20), Position = dim2(1, -40, 0.5, -10), BackgroundColor3 = Theme.MainBG, Text = key.Name, TextColor3 = Theme.Accent, FontFace = library.font, TextSize = 11, AutoButtonColor=false })
+            local btn = library:create("TextButton", { Parent = holder, Size = dim2(0, 40, 0, 20), Position = dim2(1, -40, 0.5, -10), BackgroundColor3 = Theme.ElementBG, Text = key.Name, TextColor3 = Theme.Accent, FontFace = library.font, TextSize = 11, AutoButtonColor=false })
             library:create("UICorner", {Parent = btn, CornerRadius = dim(0, 4)}); library:create("UIStroke", {Parent = btn, Color = Theme.Outline, Thickness = 1})
             
             local picking = false
             btn.MouseButton1Click:Connect(function() picking = true; btn.Text = "..." end)
             track_connection(uis.InputBegan:Connect(function(input, gpe)
                 if picking and input.UserInputType == Enum.UserInputType.Keyboard then
-                    picking = false; key = input.KeyCode; btn.Text = key.Name
-                    if p.Callback then p.Callback(key) end
+                    picking = false; key = input.KeyCode; btn.Text = key.Name; if p.Callback then p.Callback(key) end
                 end
             end))
             
@@ -497,7 +454,7 @@ function library:window(props)
             library:create("UICorner", {Parent = dispBtn, CornerRadius = dim(0, 4)}); library:create("UIStroke", {Parent = dispBtn, Color = Theme.Outline, Thickness = 1})
             
             local container = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, 130), BackgroundTransparency = 1, Visible = false })
-            local wheelBg = library:create("Frame", {Parent = container, Size = dim2(1, 0, 1, 0), BackgroundColor3 = Theme.MainBG})
+            local wheelBg = library:create("Frame", {Parent = container, Size = dim2(1, 0, 1, 0), BackgroundColor3 = Theme.ElementBG})
             library:create("UICorner", {Parent = wheelBg, CornerRadius = dim(0, 4)}); library:create("UIStroke", {Parent = wheelBg, Color = Theme.Outline, Thickness = 1})
             local wheel = library:create("ImageButton", { Parent = wheelBg, Size = dim2(0, 100, 0, 100), Position = dim2(0, 10, 0, 10), BackgroundTransparency = 1, Image = "rbxassetid://6020299385" })
             local pickerDot = library:create("ImageLabel", { Parent = wheel, Size = dim2(0, 12, 0, 12), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, Image = "rbxassetid://3678860011" })
@@ -544,16 +501,54 @@ function library:window(props)
             return api
         end
 
+        function section_api:Status(p)
+            local holder = library:create("Frame", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
+            library:create("UIListLayout", {Parent = holder, Padding = dim(0, 4)})
+            library:create("TextLabel", { Parent = holder, Text = p.Name or p.name or "Status", Size = dim2(1, 0, 0, 16), BackgroundTransparency = 1, TextColor3 = Theme.Text, FontFace = library.font, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left })
+            local stat_api = {}
+            function stat_api:AddStatus(txt)
+                local lbl = library:create("TextLabel", { Parent = holder, Text = txt, Size = dim2(1, 0, 0, 14), BackgroundTransparency = 1, TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left })
+                return { set = function(self, newTxt) lbl.Text = newTxt end }
+            end
+            return stat_api
+        end
+
+        function section_api:List(p)
+            local list_api = { items = {} }
+            local holder = library:create("Frame", { Parent = p.Parent or self.elements, Size = dim2(1, 0, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y })
+            library:create("UIListLayout", {Parent = holder, Padding = dim(0, 4), SortOrder = Enum.SortOrder.LayoutOrder})
+            library:create("TextLabel", { Parent = holder, Text = p.Name or p.name or "List", Size = dim2(1, 0, 0, 16), BackgroundTransparency = 1, TextColor3 = Theme.Text, FontFace = library.font, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left })
+            function list_api:Add(name)
+                local itemBtn = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, 26), BackgroundColor3 = Theme.ElementBG, LayoutOrder = #list_api.items })
+                library:create("UICorner", {Parent = itemBtn, CornerRadius = dim(0, 4)})
+                library:create("TextLabel", { Parent = itemBtn, Text = "  " .. name, Size = dim2(1, -40, 1, 0), BackgroundTransparency = 1, TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left })
+                table.insert(list_api.items, itemBtn)
+                local up = library:create("TextButton", {Parent = itemBtn, Size = dim2(0, 20, 1, 0), Position = dim2(1, -40, 0, 0), BackgroundTransparency = 1, Text = "▲", TextColor3 = Theme.MutedText, TextSize=10})
+                local dn = library:create("TextButton", {Parent = itemBtn, Size = dim2(0, 20, 1, 0), Position = dim2(1, -20, 0, 0), BackgroundTransparency = 1, Text = "▼", TextColor3 = Theme.MutedText, TextSize=10})
+                local function swap(dir)
+                    local idx = table.find(list_api.items, itemBtn)
+                    if idx and list_api.items[idx + dir] then
+                        local other = list_api.items[idx + dir]; list_api.items[idx] = other; list_api.items[idx + dir] = itemBtn; itemBtn.LayoutOrder = idx + dir; other.LayoutOrder = idx
+                        if p.Callback then local res = {}; for _, v in ipairs(list_api.items) do table.insert(res, v:FindFirstChildOfClass("TextLabel").Text:gsub("^%s+", "")) end; p.Callback(res) end
+                    end
+                end
+                up.MouseButton1Click:Connect(function() swap(-1) end); dn.MouseButton1Click:Connect(function() swap(1) end)
+                return itemBtn
+            end
+            if p.items then for _, v in ipairs(p.items) do list_api:Add(v) end end
+            return list_api
+        end
+
         function tab:Section(props)
             local s = {}
             local parent_col = (string.lower(props.side or "left") == "right") and right_col or left_col
             s.elements = library:create("Frame", { Parent = parent_col, Size = dim2(1, 0, 0, 0), BackgroundColor3 = Theme.SectionBG, AutomaticSize = Enum.AutomaticSize.Y })
-            library:create("UICorner", {Parent = s.elements, CornerRadius = dim(0, 4)}); library:create("UIStroke", {Parent = s.elements, Color = Theme.Outline, Thickness = 1})
-            library:create("UIListLayout", {Parent = s.elements, Padding = dim(0, 10)}); library:create("UIPadding", {Parent = s.elements, PaddingTop = dim(0, 15), PaddingBottom = dim(0, 15), PaddingLeft = dim(0, 15), PaddingRight = dim(0, 15)})
+            library:create("UICorner", {Parent = s.elements, CornerRadius = dim(0, 6)}); library:create("UIStroke", {Parent = s.elements, Color = Theme.Outline, Thickness = 1})
+            library:create("UIListLayout", {Parent = s.elements, Padding = dim(0, 12)}); library:create("UIPadding", {Parent = s.elements, PaddingTop = dim(0, 12), PaddingBottom = dim(0, 12), PaddingLeft = dim(0, 12), PaddingRight = dim(0, 12)})
             
-            local header = library:create("Frame", { Parent = s.elements, Size = dim2(1, 0, 0, 16), BackgroundTransparency = 1 })
+            local header = library:create("Frame", { Parent = s.elements, Size = dim2(1, 0, 0, 14), BackgroundTransparency = 1 })
             library:create("Frame", { Parent = header, Size = dim2(0, 6, 0, 6), Position = dim2(0, 0, 0.5, -3), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0 })
-            library:create("TextLabel", { Parent = header, Size = dim2(1, -12, 1, 0), Position = dim2(0, 12, 0, 0), BackgroundTransparency = 1, Text = string.lower(props.name or props.Name or "Section"), TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left })
+            library:create("TextLabel", { Parent = header, Size = dim2(1, -12, 1, 0), Position = dim2(0, 12, 0, 0), BackgroundTransparency = 1, Text = string.lower(props.name or "Section"), TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left })
             
             setmetatable(s, { __index = section_api })
             return s
@@ -562,12 +557,41 @@ function library:window(props)
         return tab
     end
 
-    -- Embedded Settings & Mobile UI (adapted to new styling)
+    -- ==========================================
+    -- AUTO UI SETTINGS & MOBILE BUTTONS
+    -- ==========================================
     do
-        local st = win:Tab({ name = "Settings", icon = "lucide:settings", _layoutOrder = 999999, _noAutoSelect = true })
-        local controlSection = st:Section({ name = "Controls", side = "left" })
-        controlSection:Keybind({ name = "Toggle Menu", default = Enum.KeyCode.RightControl, Callback = function(key) toggleKey = key end })
+        local function retint(old_color, new_color)
+            local epsilon = 0.008
+            local function matches(c) return math.abs(c.R - old_color.R) < epsilon and math.abs(c.G - old_color.G) < epsilon and math.abs(c.B - old_color.B) < epsilon end
+            for _, v in ipairs(screen:GetDescendants()) do
+                if v:IsA("GuiObject") and matches(v.BackgroundColor3) then library:tween(v, { BackgroundColor3 = new_color }, 0.3) end
+                if (v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox")) and matches(v.TextColor3) then library:tween(v, { TextColor3 = new_color }, 0.3) end
+                if v:IsA("UIStroke") and matches(v.Color) then library:tween(v, { Color = new_color }, 0.3) end
+                if (v:IsA("ImageLabel") or v:IsA("ImageButton")) and matches(v.ImageColor3) then library:tween(v, { ImageColor3 = new_color }, 0.3) end
+            end
+        end
 
+        local defaultTheme = {}; for k, v in pairs(Theme) do defaultTheme[k] = v end
+
+        local st = win:Tab({ name = "Settings", icon = "lucide:settings-2", _layoutOrder = 999999, _noAutoSelect = true })
+        
+        -- Left Column (Colors)
+        local colorSection = st:Section({ name = "Theme Colors", side = "left" })
+        colorSection:Colorpicker({ name = "Accent Color", default = Theme.Accent, Callback = function(c) local old = Theme.Accent; Theme.Accent = c; retint(old, c) end })
+        colorSection:Colorpicker({ name = "Main Background", default = Theme.MainBG, Callback = function(c) local old = Theme.MainBG; Theme.MainBG = c; retint(old, c) end })
+        colorSection:Colorpicker({ name = "Sidebar Background", default = Theme.SidebarBG, Callback = function(c) local old = Theme.SidebarBG; Theme.SidebarBG = c; retint(old, c) end })
+        colorSection:Colorpicker({ name = "Element Background", default = Theme.ElementBG, Callback = function(c) local old = Theme.ElementBG; Theme.ElementBG = c; retint(old, c) end })
+        
+        -- Right Column (Controls & Mobile)
+        local controlSection = st:Section({ name = "Controls", side = "right" })
+        controlSection:Keybind({ name = "Toggle Menu", default = Enum.KeyCode.RightControl, Callback = function(key) toggleKey = key end })
+        
+        controlSection:Button({ name = "Reset Colors Default", Callback = function() 
+            for k, v in pairs(defaultTheme) do local old = Theme[k]; if typeof(old) == "Color3" then Theme[k] = v; retint(old, v) end end 
+            library:create_notification({name="Colors Reset", duration=3})
+        end })
+        
         local mobileSection = st:Section({ name = "Mobile Settings", side = "right" })
         local activeFloatingBtns = {}
 
@@ -575,7 +599,7 @@ function library:window(props)
             local floatGui = library:create("ScreenGui", { Parent = ui_parent, Name = "SynqBtn_" .. toggleName, ResetOnSpawn = false })
             local floatBtn = library:create("TextButton", {
                 Parent = floatGui, Size = dim2(0, 50, 0, 50), Position = dim2(0, 20, 0.5, -25 + (#activeFloatingBtns * 55)),
-                BackgroundColor3 = toggleApi.enabled and Theme.Accent or Theme.SectionBG, Text = "", AutoButtonColor = false
+                BackgroundColor3 = toggleApi.enabled and Theme.Accent or Theme.ElementBG, Text = "", AutoButtonColor = false
             })
             library:create("UICorner", { Parent = floatBtn, CornerRadius = dim(1, 0) }); library:create("UIStroke", { Parent = floatBtn, Color = Theme.Outline, Thickness = 1 })
             local floatLabel = library:create("TextLabel", { Parent = floatBtn, Size = dim2(1, 0, 1, 0), BackgroundTransparency = 1, Text = string.sub(toggleName, 1, 3):upper(), TextColor3 = toggleApi.enabled and Theme.MainBG or Theme.Text, FontFace = library.bold_font, TextSize = 12 })
@@ -583,7 +607,7 @@ function library:window(props)
             local dragging, dragStart, startPos, hasMoved = false, nil, nil, false
             floatBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; hasMoved = false; dragStart = input.Position; startPos = floatBtn.Position end end)
             track_connection(uis.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart; if delta.Magnitude > 4 then hasMoved = true end; floatBtn.Position = dim2(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end))
-            track_connection(uis.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then if dragging and not hasMoved then toggleApi:set(not toggleApi.enabled); library:tween(floatBtn, { BackgroundColor3 = toggleApi.enabled and Theme.Accent or Theme.SectionBG }, 0.15); floatLabel.TextColor3 = toggleApi.enabled and Theme.MainBG or Theme.Text end; dragging = false end end))
+            track_connection(uis.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then if dragging and not hasMoved then toggleApi:set(not toggleApi.enabled); library:tween(floatBtn, { BackgroundColor3 = toggleApi.enabled and Theme.Accent or Theme.ElementBG }, 0.15); floatLabel.TextColor3 = toggleApi.enabled and Theme.MainBG or Theme.Text end; dragging = false end end))
             return { gui = floatGui, destroy = function() floatGui:Destroy() end }
         end
 
@@ -610,16 +634,10 @@ function library:create_notification(props)
     
     local title = library:create("TextLabel", { Parent = notif, Size = dim2(1, -20, 1, 0), Position = dim2(0, 16, 0, 0), BackgroundTransparency = 1, Text = name, TextColor3 = Theme.Text, FontFace = library.font, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1 })
     
-    library:tween(notif, {BackgroundTransparency = 0}, 0.3)
-    library:tween(stroke, {Transparency = 0}, 0.3)
-    library:tween(ind, {BackgroundTransparency = 0}, 0.3)
-    library:tween(title, {TextTransparency = 0}, 0.3)
+    library:tween(notif, {BackgroundTransparency = 0}, 0.3); library:tween(stroke, {Transparency = 0}, 0.3); library:tween(ind, {BackgroundTransparency = 0}, 0.3); library:tween(title, {TextTransparency = 0}, 0.3)
     
     task.delay(duration, function()
-        local fade = library:tween(notif, {BackgroundTransparency = 1}, 0.5)
-        library:tween(stroke, {Transparency = 1}, 0.5)
-        library:tween(ind, {BackgroundTransparency = 1}, 0.5)
-        library:tween(title, {TextTransparency = 1}, 0.5)
+        local fade = library:tween(notif, {BackgroundTransparency = 1}, 0.5); library:tween(stroke, {Transparency = 1}, 0.5); library:tween(ind, {BackgroundTransparency = 1}, 0.5); library:tween(title, {TextTransparency = 1}, 0.5)
         fade.Completed:Connect(function() notif:Destroy() end)
     end)
 end
