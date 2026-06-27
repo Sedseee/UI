@@ -1,0 +1,425 @@
+--// Sedse UI Library V2 (Tactical & Brutalist HUD Overhaul)
+--// Mobile Compact + Precision Terminal Vibe
+
+local cloneref = (cloneref or clonereference or function(instance: any) return instance end)
+local CoreGui = cloneref(game:GetService("CoreGui"))
+local Players = cloneref(game:GetService("Players"))
+local RunService = cloneref(game:GetService("RunService"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
+local TextService = cloneref(game:GetService("TextService"))
+local TweenService = cloneref(game:GetService("TweenService"))
+
+local gethui = gethui or function() return CoreGui end
+
+local FetchIcons, Icons
+pcall(function()
+    Icons = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/lucide-roblox-direct/refs/heads/main/source.lua"))()
+    FetchIcons = true
+end)
+
+local Library = {
+    ScreenGui = nil, Registry = {}, Options = {}, Toggles = {},
+    Tabs = {}, IsMobile = UserInputService.TouchEnabled, Toggled = true,
+    ToggleKeybind = Enum.KeyCode.RightControl, CornerRadius = 2, -- Extremely sharp, sleek corners
+    TweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), -- Faster, responsive animations
+    
+    Scheme = {
+        BackgroundColor = Color3.fromRGB(9, 9, 9),       -- Deep Abyss Base
+        SidebarColor    = Color3.fromRGB(13, 13, 13),      
+        MainColor       = Color3.fromRGB(15, 15, 15),    -- Slightly elevated elements
+        AccentColor     = Color3.fromRGB(250, 45, 30),     -- Vivid HUD Red/Orange
+        OutlineColor    = Color3.fromRGB(38, 38, 38),      -- Clear bounds framing
+        FontColor       = Color3.fromRGB(220, 220, 220), 
+        SecondaryColor  = Color3.fromRGB(110, 110, 110),   -- Stealthy grays
+        FontId          = Enum.Font.RobotoMono,
+    },
+}
+
+local Templates = {
+    Window   = { Title = "SYSTEM.CORE", Size = UDim2.fromOffset(590, 360), Position = UDim2.fromOffset(50, 50) },
+    Toggle   = { Text = "Toggle", Description = "", Default = false, Callback = function() end },
+    Slider   = { Text = "Slider", Default = 0, Min = 0, Max = 100, Rounding = 0, Suffix = "", Callback = function() end },
+    Dropdown = { Text = "Dropdown", Description = "", Values = {}, Default = nil, Multi = false, Callback = function() end },
+    Input    = { Text = "Input", Default = "", Placeholder = "", Callback = function() end }
+}
+
+-- Asset Manager
+function Library:GetIcon(IconName)
+    if not FetchIcons or not Icons then return nil end
+    local Success, Icon = pcall(Icons.GetAsset, IconName)
+    return Success and Icon or nil
+end
+
+function Library:GetCustomIcon(IconName)
+    if type(IconName) ~= "string" and type(IconName) ~= "number" then return nil end
+    if tonumber(IconName) then IconName = "rbxassetid://" .. tostring(IconName) end
+    if IconName:match("rbxasset") or IconName:match("roblox%.com/asset") or IconName:match("rbxthumb://") then
+        return { Url = IconName, ImageRectOffset = Vector2.zero, ImageRectSize = Vector2.zero, Custom = true }
+    end
+    return Library:GetIcon(IconName)
+end
+
+function Library:Validate(Provided, Template)
+    if type(Provided) ~= "table" then return Template end
+    for k, v in pairs(Template) do
+        if Provided[k] == nil then Provided[k] = v
+        elseif type(v) == "table" and type(Provided[k]) == "table" then Provided[k] = Library:Validate(Provided[k], v) end
+    end
+    return Provided
+end
+
+function Library:SafeCallback(Func, ...)
+   task.spawn(function(...) pcall(Func, ...) end, ...)
+end
+
+local function FillInstance(Table, Instance)
+    local ThemeProps = Library.Registry[Instance] or {}
+    for key, value in pairs(Table) do
+        if key ~= "Text" and type(value) == "string" and Library.Scheme[value] ~= nil then ThemeProps[key] = value; value = Library.Scheme[value] end
+        if key == "FontFace" and value == "Font" then value = Font.fromEnum(Library.Scheme.FontId) end
+        pcall(function() Instance[key] = value end)
+    end
+    if next(ThemeProps) then Library.Registry[Instance] = ThemeProps end
+end
+
+local function New(ClassName, Properties)
+    local Inst = Instance.new(ClassName); FillInstance(Properties, Inst); return Inst
+end
+
+-- ScreenGui initialization
+pcall(function() if CoreGui:FindFirstChild("SedseLoader") then CoreGui.SedseLoader:Destroy() end end)
+local ScreenGui = New("ScreenGui", { Name = "SedseLoader", DisplayOrder = 998, ResetOnSpawn = false })
+pcall(protectgui, ScreenGui); ScreenGui.Parent = gethui()
+Library.ScreenGui = ScreenGui
+
+function Library:MakeDraggable(UI, DraggerTarget)
+    local Dragging, DragInput, StartPos, StartBounds
+    DraggerTarget.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            Dragging = true; StartPos = input.Position; StartBounds = UI.Position
+        end
+    end)
+    DraggerTarget.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then DragInput = input end end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == DragInput and Dragging then
+            local Delta = input.Position - StartPos
+            UI.Position = UDim2.new(StartBounds.X.Scale, StartBounds.X.Offset + Delta.X, StartBounds.Y.Scale, StartBounds.Y.Offset + Delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input) if input == DragInput then Dragging = false end; if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then Dragging=false end end)
+end
+
+-- Component Factories
+local BaseAddons = {}
+do
+    local Funcs = {}
+    
+    function Funcs:AddToggle(Idx, Info)
+        Info = Library:Validate(Info, Templates.Toggle)
+        local Height = (Info.Description and Info.Description ~= "") and 40 or 26
+        
+        local Holder = New("TextButton", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, Height), Text = "", Parent = self.Container })
+        
+        -- Text prefixed with '>' for terminal aesthetics
+        New("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, -30, 0, 14), Text = "> " .. Info.Text:upper(), TextSize = 10, TextColor3 = "FontColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = Holder })
+        
+        if Info.Description and Info.Description ~= "" then
+             local LbP ={ BackgroundTransparency = 1, Position = UDim2.new(0, 10, 0, 15), Size = UDim2.new(1, -40, 1, -15), Text = Info.Description, TextSize = 10, TextColor3 = "SecondaryColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = Holder }
+             if string.find(Info.Description, "\n") then LbP.TextYAlignment = Enum.TextYAlignment.Top end
+             New("TextLabel", LbP)
+        end
+
+        local Trak = New("Frame", { BackgroundColor3 = "MainColor", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.new(0, 30, 0, 14), Parent = Holder })
+        New("UIStroke", { Color = "OutlineColor", Parent = Trak })
+        New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = Trak })
+        
+        -- Tactical block switch mechanism instd of circular knob
+        local Knob = New("Frame", { BackgroundColor3 = "OutlineColor", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 2, 0.5, 0), Size = UDim2.new(0, 10, 1, -4), Parent = Trak })
+        New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius-1), Parent = Knob })
+        
+        local TgleState = { Value = Info.Default, Type = "Toggle" }
+
+        function TgleState:UpdateDisplay()
+            local VActive = TgleState.Value
+            TweenService:Create(Trak, Library.TweenInfo, { BackgroundColor3 = VActive and Color3.fromRGB(45, 15, 12) or Library.Scheme.MainColor }):Play()
+            TweenService:Create(Knob, Library.TweenInfo, { Position = VActive and UDim2.new(1, -12, 0.5, 0) or UDim2.new(0, 2, 0.5, 0), BackgroundColor3 = VActive and Library.Scheme.AccentColor or Library.Scheme.OutlineColor }):Play()
+        end
+        function TgleState:SetValue(Val)
+            TgleState.Value = Val; TgleState:UpdateDisplay()
+            Library:SafeCallback(Info.Callback, Val)
+        end
+        Holder.MouseButton1Click:Connect(function() TgleState:SetValue(not TgleState.Value) end)
+
+        TgleState:UpdateDisplay(); self:Resize()
+        table.insert(self.Elements, TgleState); Library.Options[Idx] = TgleState; return TgleState
+    end
+
+    function Funcs:AddSlider(Idx, Info)
+        Info = Library:Validate(Info, Templates.Slider)
+        local Sld = { Value = Info.Default, Type = "Slider" }
+
+        local Holder = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = self.Container }) 
+        New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 2), Size = UDim2.new(0.65, 0, 0, 12), Text = Info.Text:upper(), TextSize = 10, TextColor3 = "SecondaryColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = Holder })
+        local ValRef = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1,0), Position = UDim2.new(1, 0, 0, 2), Size = UDim2.new(0.35, 0, 0, 12), Text = "", TextSize = 10, TextColor3 = "AccentColor", TextXAlignment = Enum.TextXAlignment.Right, FontFace = "Font", Parent = Holder })
+        
+        local BarZone = New("TextButton", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 16), Text = "", Parent = Holder })
+        local BarLine = New("Frame", { BackgroundColor3 = "MainColor", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(1, 0, 0, 6), Parent = BarZone })
+        New("UIStroke", { Color = "OutlineColor", Parent = BarLine })
+        New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = BarLine })
+        
+        -- Flat filling line completely eliminating Knob (Clean visual loading layout)
+        local FilCol = New("Frame", { BackgroundColor3 = "AccentColor", Size = UDim2.new(0, 0, 1, 0), Parent = BarLine })
+        New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = FilCol })
+
+        function Sld:UpdateDisp()
+            local TrM = math.clamp((Sld.Value - Info.Min) / (Info.Max - Info.Min), 0, 1)
+            ValRef.Text = "["..tostring(Sld.Value) .. Info.Suffix.."]"; FilCol.Size = UDim2.new(TrM, 0, 1, 0)
+        end
+        function Sld:SetValue(ValIn)
+            local FltCmb = math.clamp(ValIn, Info.Min, Info.Max)
+            if Info.Rounding > 0 then local Mlb = 10 ^ Info.Rounding; FltCmb = math.floor(FltCmb * Mlb + 0.5) / Mlb
+            else FltCmb = math.floor(FltCmb + 0.5) end
+            
+            Sld.Value = FltCmb; Sld:UpdateDisp(); Library:SafeCallback(Info.Callback, FltCmb)
+        end
+
+        local LocDrag = false
+        BarZone.InputBegan:Connect(function(IoPs)
+            if IoPs.UserInputType == Enum.UserInputType.MouseButton1 or IoPs.UserInputType == Enum.UserInputType.Touch then
+                LocDrag = true
+                while LocDrag and RunService.RenderStepped:Wait() do
+                    local ActMoZ = UserInputService:GetMouseLocation().X
+                    local FinPc = math.clamp((ActMoZ - BarZone.AbsolutePosition.X) / BarZone.AbsoluteSize.X, 0, 1)
+                    Sld:SetValue(Info.Min + ((Info.Max - Info.Min) * FinPc))
+                end
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(IoPs) if IoPs.UserInputType == Enum.UserInputType.MouseButton1 or IoPs.UserInputType == Enum.UserInputType.Touch then LocDrag = false end end)
+
+        Sld:UpdateDisp(); self:Resize()
+        table.insert(self.Elements, Sld); Library.Options[Idx] = Sld; return Sld
+    end
+
+    function Funcs:AddDropdown(Idx, Info)
+        Info = Library:Validate(Info, Templates.Dropdown)
+        local HeightsParams = (Info.Description and Info.Description ~= "") and 54 or 42
+        
+        local Holder = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, HeightsParams), Parent = self.Container })
+        New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0,0,0,0), Size = UDim2.new(1, 0, 0, 14), Text = "> " .. Info.Text:upper(), TextSize = 10, TextColor3 = "FontColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = Holder })
+        if Info.Description and Info.Description ~= "" then
+            New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0,0,0,16), Size = UDim2.new(1, 0, 0, 10), Text = Info.Description, TextSize = 10, TextColor3 = "SecondaryColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = Holder })
+        end
+
+        local SelectBtn = New("TextButton", { BackgroundColor3 = "BackgroundColor", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 20), Text = "", ZIndex = 3, Parent = Holder })
+        New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = SelectBtn })
+        New("UIStroke", { Color = "OutlineColor", Parent = SelectBtn })
+        local RenderLab = New("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, -20, 1, 0), TextSize = 10, TextColor3 = "SecondaryColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", ZIndex = 3, Parent = SelectBtn })
+        New("UIPadding", { PaddingLeft = UDim.new(0, 10), Parent = RenderLab })
+        
+        New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -5, 0.5, 0), Size = UDim2.fromOffset(12, 12), Text = "V", TextSize = 10, TextColor3 = "SecondaryColor", FontFace = "Font", ZIndex = 3, Parent = SelectBtn }) 
+
+        local ExMenu = New("ScrollingFrame", { BackgroundColor3 = "OutlineColor", BorderSizePixel = 0, Visible = false, Size = UDim2.new(0, 100, 0, 0), ScrollBarThickness = 0, CanvasSize = UDim2.new(), ZIndex = 15, Parent = ScreenGui })
+        local ClipFrame = New("Frame", { BackgroundColor3 = "MainColor", Position = UDim2.fromOffset(1,1), Size = UDim2.new(1,-2,1,-2), ZIndex = 15, Parent = ExMenu }) -- Inner padding outline trick perfectly executed
+        New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = ExMenu }); New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius-1), Parent = ClipFrame })
+        New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Parent = ClipFrame })
+
+        local DropMdo = { Value = Info.Multi and {} or Info.Default, Type = "Dropdown" }
+        local MenuVisEx = false
+
+        function DropMdo:TckLbs()
+            local LabGen = ""
+            if Info.Multi then
+                local Trs = {}  for k,v in pairs(DropMdo.Value) do if v then table.insert(Trs, k) end end
+                LabGen = #Trs > 0 and table.concat(Trs, ", ") or "N/A"
+            else LabGen = DropMdo.Value or "N/A" end
+            RenderLab.Text = LabGen
+        end
+
+        function DropMdo:BltGen()
+            for _, ChZ in pairs(ClipFrame:GetChildren()) do if ChZ:IsA("TextButton") then ChZ:Destroy() end end
+            local H = 0
+            for _, TstrStrp in ipairs(Info.Values) do
+                local IBttn = New("TextButton", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 22), Text = tostring(TstrStrp), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = "FontColor", TextSize = 10, FontFace = "Font", ZIndex = 16, Parent = ClipFrame })
+                New("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = IBttn })
+                
+                IBttn.MouseButton1Click:Connect(function()
+                    if Info.Multi then DropMdo.Value[TstrStrp] = not DropMdo.Value[TstrStrp] else DropMdo.Value = TstrStrp; MenuVisEx = false end
+                    DropMdo:TckLbs(); Library:SafeCallback(Info.Callback, DropMdo.Value)
+                    if not MenuVisEx then ExMenu.Visible = false end
+                end)
+                H = H + 22
+            end
+            ExMenu.CanvasSize = UDim2.new(0,0,0,H)
+            ExMenu.Size = UDim2.new(0, SelectBtn.AbsoluteSize.X, 0, math.clamp(H, 0, 110))
+        end
+
+        SelectBtn.MouseButton1Click:Connect(function()
+            MenuVisEx = not MenuVisEx
+            if MenuVisEx then
+                ExMenu.Position = UDim2.new(0, SelectBtn.AbsolutePosition.X, 0, SelectBtn.AbsolutePosition.Y + 24)
+                ExMenu.Size = UDim2.new(0, SelectBtn.AbsoluteSize.X, 0, ExMenu.Size.Y.Offset)
+            end
+            ExMenu.Visible = MenuVisEx
+        end)
+
+        DropMdo:BltGen(); DropMdo:TckLbs(); self:Resize()
+        table.insert(self.Elements, DropMdo); Library.Options[Idx] = DropMdo; return DropMdo
+    end
+
+    function Funcs:AddInput(Idx, Info)
+        Info = Library:Validate(Info, Templates.Input)
+        local InputRef = { Value = Info.Default, Type = "Input" }
+
+        local Holder = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 42), Parent = self.Container })
+        New("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1,0,0,14), Text = "> " .. Info.Text:upper(), TextColor3 = "FontColor", TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = Holder })
+
+        local WrapBox = New("Frame", { BackgroundColor3 = "BackgroundColor", AnchorPoint = Vector2.new(0,1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 22), Parent = Holder })
+        New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = WrapBox })
+        New("UIStroke", { Color = "OutlineColor", Parent = WrapBox })
+        
+        local Bxs = New("TextBox", { BackgroundTransparency=1, Position = UDim2.new(0,8,0,0), Size = UDim2.new(1,-16,1,0), Text = Info.Default, PlaceholderText = Info.Placeholder, TextColor3 = "SecondaryColor", TextSize=10, TextXAlignment = Enum.TextXAlignment.Left, FontFace="Font", Parent = WrapBox })
+
+        Bxs.FocusLost:Connect(function()
+            InputRef.Value = Bxs.Text; Library:SafeCallback(Info.Callback, InputRef.Value)
+        end)
+
+        self:Resize(); table.insert(self.Elements, InputRef); Library.Options[Idx] = InputRef; return InputRef
+    end
+
+    function Funcs:AddDivider(TextDesc)
+        local Holder = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 25), Parent = self.Container })
+        if TextDesc then
+            New("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Text = "-- " .. tostring(TextDesc):upper() .. " --", TextColor3 = "SecondaryColor", TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, FontFace = "Font", Parent = Holder })
+        else
+            New("Frame", { BackgroundColor3 = "OutlineColor", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(1, 0, 0, 1), Parent = Holder })
+        end
+        self:Resize(); return { Holder = Holder, Type = "Divider" }
+    end
+
+    BaseAddons.__index = Funcs
+end
+
+-- Layout Processor Frame Updates
+local CntLayout = setmetatable({}, BaseAddons)
+function CntLayout:Resize()
+    local HeightAccum = 0
+    for _, Eml in ipairs(self.Container:GetChildren()) do
+        if Eml:IsA("GuiObject") and Eml.Visible then HeightAccum = HeightAccum + Eml.AbsoluteSize.Y + 8 end
+    end
+    self.Holder.Size = UDim2.new(1, 0, 0, HeightAccum + 38)
+    
+    if self.TabObj and self.TabObj.MainPage then
+        local L, R = self.TabObj.ColumnL:FindFirstChildOfClass("UIListLayout"), self.TabObj.ColumnR:FindFirstChildOfClass("UIListLayout")
+        self.TabObj.MainPage.CanvasSize = UDim2.new(0, 0, 0, math.max(L and L.AbsoluteContentSize.Y or 0, R and R.AbsoluteContentSize.Y or 0) + 60)
+    end
+end
+CntLayout.__index = CntLayout
+
+-- Initialize & Structure Window Map
+function Library:CreateWindow(Info)
+    Info = Library:Validate(Info, Templates.Window)
+    if typeof(Info.Font) == "EnumItem" then Library.Scheme.FontId = Info.Font end
+    local FinalScaV = Info.Size
+
+    -- Window Structure Split (No borders!)
+    local Container = New("Frame", { BackgroundTransparency=1, Position = Info.Position, Size = FinalScaV, Active = true, Parent = ScreenGui })
+    
+    local TopHeader = New("TextButton", { BackgroundColor3 = "SidebarColor", Size = UDim2.new(1, 0, 0, 45), AutoButtonColor = false, Text = "", Parent = Container })
+    New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = TopHeader })
+    New("Frame", { BackgroundColor3="SidebarColor", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, Library.CornerRadius), Parent = TopHeader }) -- Hides bottom rounding
+    Library:MakeDraggable(Container, TopHeader)
+    
+    local SubWdw = New("Frame", { BackgroundColor3 = "BackgroundColor", Position = UDim2.new(0, 0, 0, 45), Size = UDim2.new(1, 0, 1, -45), ClipsDescendants = true, Parent = Container })
+    New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = SubWdw })
+    New("Frame", { BackgroundColor3="BackgroundColor", Size = UDim2.new(1, 0, 0, Library.CornerRadius), Parent = SubWdw }) -- Removes explicit top frame bounds
+    New("UIStroke", { Color="OutlineColor", Parent=Container }) -- Complete outer outline wraps gracefully combining the elements visually
+
+    New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(25, 0), Size = UDim2.new(1, -25, 1, 0), Text = Info.Title, LetterSpacing = 0.2, TextSize = 13, TextColor3 = "FontColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = TopHeader })
+    
+    local SDBR_Len = 110
+    local CsidePlatf = New("Frame", { BackgroundColor3 = "BackgroundColor", Position = UDim2.new(0,0,0,0), Size = UDim2.new(0, SDBR_Len, 1, 0), Parent = SubWdw })
+    New("Frame", { BackgroundColor3 = "OutlineColor", AnchorPoint = Vector2.new(1,0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 1, 1, 0), Parent = CsidePlatf })
+    
+    local TabsMenu = New("ScrollingFrame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), ScrollBarThickness = 0, CanvasSize = UDim2.new(), Parent = CsidePlatf })
+    New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2), Parent = TabsMenu })
+    New("UIPadding", { PaddingTop = UDim.new(0, 10), Parent=TabsMenu })
+
+    local PgsWrapR = New("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, SDBR_Len + 1, 0, 0), Size = UDim2.new(1, -SDBR_Len - 1, 1, 0), ClipsDescendants=true, Parent = SubWdw })
+
+    local CtrlWdBox = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 14), Size = UDim2.fromOffset(60, 22), ZIndex = 3, Parent = Container })
+    New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = UDim.new(0, 5), Parent = CtrlWdBox })
+    
+    -- Absolute Index Sorting Layout Forces rendering perfectly.
+    local BnTMin = New("TextButton", { BackgroundTransparency=1, LayoutOrder=1, Size = UDim2.fromOffset(24,20), Text="-", TextColor3="SecondaryColor", TextSize=18, FontFace="Font", Parent = CtrlWdBox })
+    local BnTXCl = New("TextButton", { BackgroundTransparency=1, LayoutOrder=2, Size = UDim2.fromOffset(24,20), Text="X", TextColor3="SecondaryColor", TextSize=13, FontFace="Font", Parent = CtrlWdBox })
+    
+    BnTXCl.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+    BnTMin.MouseButton1Click:Connect(function()
+        Library.Toggled = not Library.Toggled; SubWdw.Visible = Library.Toggled; Container.Size = Library.Toggled and FinalScaV or UDim2.fromOffset(FinalScaV.X.Offset, 45)
+    end)
+
+    local MntUX = { ExtTabs = {} }
+    function MntUX:AddTab(LabelTrf, IcnfT)
+        local TnBtOut = New("TextButton", { BackgroundColor3 = "OutlineColor", BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 32), Position = UDim2.fromOffset(4, 0), Text = "", AutoButtonColor=false, Parent = TabsMenu })
+        New("UICorner", { CornerRadius=UDim.new(0, 4), Parent=TnBtOut })
+
+        local IndctSlid = New("Frame", { BackgroundColor3 = "AccentColor", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, -4, 0.5, 0), Size = UDim2.new(0, 2, 1, -12), Visible = false, Parent = TnBtOut })
+        New("UICorner", {CornerRadius = UDim.new(1, 0), Parent = IndctSlid})
+
+        local AcInRff = Library:GetCustomIcon(IcnfT or "component")
+        local VIdctMap = New("ImageLabel", { BackgroundTransparency = 1, Position = UDim2.new(0, 6, 0.5, -7), Size = UDim2.fromOffset(14, 14), Image = AcInRff and AcInRff.Url or "", ImageRectOffset = AcInRff and AcInRff.ImageRectOffset or Vector2.zero, ImageRectSize = AcInRff and AcInRff.ImageRectSize or Vector2.zero, ImageColor3 = "SecondaryColor", Parent = TnBtOut })
+        local VTitbStO = New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0, 26, 0, 0), Size = UDim2.new(1, -26, 1, 0), Text = LabelTrf:lower(), TextSize = 10, TextColor3 = "SecondaryColor", TextXAlignment=Enum.TextXAlignment.Left, FontFace = "Font", Parent = TnBtOut })
+
+        local RPSectBodyId = New("ScrollingFrame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), CanvasSize = UDim2.new(), ScrollBarThickness = 1, Visible = false, Parent = PgsWrapR })
+        New("UIPadding", { PaddingTop = UDim.new(0, 20), PaddingBottom = UDim.new(0, 20), PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), Parent = RPSectBodyId })
+        
+        local PL_Col = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.5, -6, 1, 0), Parent = RPSectBodyId })
+        local PR_Col = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1,0), Position = UDim2.new(1,0,0,0), Size = UDim2.new(0.5, -6, 1, 0), Parent = RPSectBodyId })
+        New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 14), Parent = PL_Col })
+        New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 14), Parent = PR_Col })
+
+        local CurTbIntDct = { MainPage = RPSectBodyId, ColumnL = PL_Col, ColumnR = PR_Col }
+        
+        local function EnableThisTab()
+            if Library.MdtCtxSve then
+                Library.MdtCtxSve.VId.ImageColor3 = Library.Scheme.SecondaryColor; Library.MdtCtxSve.VTt.TextColor3 = Library.Scheme.SecondaryColor
+                Library.MdtCtxSve.HllB.Visible = false; Library.MdtCtxSve.PnnP.Visible = false; TweenService:Create(Library.MdtCtxSve.TTrx, Library.TweenInfo, {BackgroundTransparency=1}):Play()
+            end
+            VIdctMap.ImageColor3 = Library.Scheme.FontColor; VTitbStO.TextColor3 = Library.Scheme.FontColor
+            IndctSlid.Visible = true; RPSectBodyId.Visible = true; TweenService:Create(TnBtOut, Library.TweenInfo, {BackgroundTransparency=0.85}):Play()
+            Library.MdtCtxSve = { VId=VIdctMap, VTt=VTitbStO, HllB=IndctSlid, PnnP=RPSectBodyId, TTrx=TnBtOut }
+        end
+        
+        TnBtOut.MouseButton1Click:Connect(EnableThisTab)
+        if not Library.MdtCtxSve then EnableThisTab() end
+
+        function CurTbIntDct:AddGroup(TitleTrkDt, AlignOrds)
+            local TrsColTg = AlignOrds == 2 and PR_Col or PL_Col
+            local GbOutBound = New("Frame", { BackgroundColor3 = "MainColor", Size = UDim2.new(1, 0, 0, 100), Parent = TrsColTg })
+            New("UIStroke", { Color="OutlineColor", Parent=GbOutBound}); New("UICorner", { CornerRadius=UDim.new(0, Library.CornerRadius), Parent=GbOutBound })
+            
+            -- Brisk Bold Top Label Stroke Tracker Setup instead of underline
+            local GpTrSlyf = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 26), Parent = GbOutBound })
+            New("Frame", { BackgroundColor3 = "AccentColor", Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(1, -20, 0, 1), Parent = GpTrSlyf })
+            New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1,-24,1, -4), Text = TitleTrkDt:lower(), TextSize = 10, TextColor3 = "SecondaryColor", TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = GpTrSlyf })
+
+            local CtPackRff = New("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 26), Size = UDim2.new(1, 0, 1, -26), Parent = GbOutBound })
+            New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6), Parent = CtPackRff })
+            New("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 12), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), Parent = CtPackRff })
+
+            local MMvRxCt = { Holder = GbOutBound, Container = CtPackRff, Elements = {}, TabObj = CurTbIntDct }
+            setmetatable(MMvRxCt, CntLayout); MMvRxCt:Resize(); return MMvRxCt
+        end
+
+        function CurTbIntDct:AddLeftGroupbox(SxP) return CurTbIntDct:AddGroup(SxP, 1) end
+        function CurTbIntDct:AddRightGroupbox(SxP) return CurTbIntDct:AddGroup(SxP, 2) end
+
+        return CurTbIntDct
+    end
+
+    UserInputService.InputBegan:Connect(function(Imp) if Imp.KeyCode == Library.ToggleKeybind and not UserInputService:GetFocusedTextBox() then ScreenGui.Enabled = not ScreenGui.Enabled end end)
+    return MntUX
+end
+
+getgenv().Library = Library
+return Library
