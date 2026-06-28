@@ -1,5 +1,5 @@
 --// Sedse UI Library v4 (Revamped)
---// SYNQ Design Scheme — Left Sidebar Layout — Azure Build
+--// SEDSE Design Scheme — Left Sidebar Layout — Azure Build
 
 local cloneref = (cloneref or clonereference or function(instance) return instance end)
 local CoreGui          = cloneref(game:GetService("CoreGui"))
@@ -47,16 +47,27 @@ local Library = {
 }
 
 local Templates = {
-    Window   = { Title = "S Y N Q", Size = UDim2.fromOffset(640, 420) },
+    Window   = { Title = "S E D S E", Size = UDim2.fromOffset(640, 420) },
     Toggle   = { Text = "Toggle",   Description = "", Default = false,    Callback = function() end },
     Slider   = { Text = "Slider",   Default = 0, Min = 0, Max = 100, Rounding = 0, Suffix = "", Callback = function() end },
     Dropdown = { Text = "Dropdown", Description = "", Values = {}, Default = nil, Multi = false, Callback = function() end },
     Input    = { Text = "Input",    Default = "", Placeholder = "",       Callback = function() end },
     Button   = { Text = "Button",   Description = "",                     Callback = function() end },
     Label    = { Text = "Label",    Description = "" },
+    Keybind  = { Text = "Keybind",  Default = Enum.KeyCode.Unknown,       Callback = function() end },
 }
 
 -- ─── Utilities ───────────────────────────────────────────────────────────────
+
+function Library:create_notification(info)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "SEDSE Notification",
+            Text = info.name or info.Text or "",
+            Duration = info.duration or 2
+        })
+    end)
+end
 
 function Library:GetIcon(IconName)
     if not FetchIcons or not Icons then return nil end
@@ -248,12 +259,13 @@ do
             ToggleObj:UpdateDisplay()
             Library:SafeCallback(ToggleObj.Callback, Val)
         end
+        ToggleObj.set = ToggleObj.SetValue
 
         Holder.MouseButton1Click:Connect(function() ToggleObj:SetValue(not ToggleObj.Value) end)
         ToggleObj:UpdateDisplay()
         self:Resize()
         table.insert(self.Elements, ToggleObj)
-        Library.Options[Idx] = ToggleObj
+        if Idx then Library.Options[Idx] = ToggleObj end
         return ToggleObj
     end
 
@@ -348,6 +360,7 @@ do
             SliderObj:UpdateDisplay()
             Library:SafeCallback(Info.Callback, Val)
         end
+        SliderObj.set = SliderObj.SetValue
 
         local SlDragging = false
         Interact.InputBegan:Connect(function(Imp)
@@ -372,11 +385,11 @@ do
         SliderObj:UpdateDisplay()
         self:Resize()
         table.insert(self.Elements, SliderObj)
-        Library.Options[Idx] = SliderObj
+        if Idx then Library.Options[Idx] = SliderObj end
         return SliderObj
     end
 
-    -- ─── Dropdown (with RenderStepped drag-follow fix) ───────────────────────
+    -- ─── Dropdown ────────────────────────────────────────────────────────────
     function Class:AddDropdown(Idx, Info)
         Info = Library:Validate(Info, Templates.Dropdown)
         local hasDesc = Info.Description and Info.Description ~= ""
@@ -456,7 +469,7 @@ do
             ScrollBarThickness = 2,
             CanvasSize         = UDim2.new(),
             ZIndex             = 50,
-            Parent             = ScreenGui,   -- parented to ScreenGui, not window
+            Parent             = ScreenGui,
         })
         New("UICorner", { CornerRadius = UDim.new(0, 6), Parent = DropWindow })
         New("UIStroke", { Color = "OutlineColor", Thickness = 1, Parent = DropWindow })
@@ -473,9 +486,8 @@ do
 
         local Dropdo     = { Value = Info.Multi and {} or Info.Default, Type = "Dropdown" }
         local MenuActive = false
-        local dropConn   = nil   -- RenderStepped drag-follow connection
+        local dropConn   = nil
 
-        -- Always recompute position from Disp's current AbsolutePosition
         local function updateDropPos()
             DropWindow.Position = UDim2.new(
                 0, Disp.AbsolutePosition.X,
@@ -550,13 +562,28 @@ do
             DropWindow.Size       = UDim2.new(0, Disp.AbsoluteSize.X, 0, math.clamp(total, 0, 160))
         end
 
+        function Dropdo:set_items(newVals)
+            Info.Values = newVals
+            if not Info.Multi and not table.find(newVals, Dropdo.Value) then 
+                Dropdo.Value = newVals[1] 
+            end
+            self:SyncRenderOptions()
+            self:UpdateLabels()
+        end
+
+        function Dropdo:SetValue(val)
+            Dropdo.Value = val
+            self:SyncRenderOptions()
+            self:UpdateLabels()
+        end
+        Dropdo.set = Dropdo.SetValue
+
         Disp.MouseButton1Click:Connect(function()
             MenuActive = not MenuActive
             if MenuActive then
                 Dropdo:SyncRenderOptions()
                 updateDropPos()
                 DropWindow.Visible = true
-                -- Follow window while being dragged
                 if dropConn then dropConn:Disconnect() end
                 dropConn = RunService.RenderStepped:Connect(updateDropPos)
                 TweenService:Create(Arrow, Library.TweenInfo, { Rotation = 180 }):Play()
@@ -565,7 +592,6 @@ do
             end
         end)
 
-        -- Click-outside to close
         UserInputService.InputBegan:Connect(function(inp)
             if not MenuActive then return end
             if inp.UserInputType ~= Enum.UserInputType.MouseButton1
@@ -582,7 +608,7 @@ do
         Dropdo:UpdateLabels()
         self:Resize()
         table.insert(self.Elements, Dropdo)
-        Library.Options[Idx] = Dropdo
+        if Idx then Library.Options[Idx] = Dropdo end
         return Dropdo
     end
 
@@ -632,6 +658,13 @@ do
             Parent            = Wrap,
         })
 
+        function InputRef:SetValue(val)
+            InputRef.Value = val
+            Bxs.Text = tostring(val)
+            Library:SafeCallback(Info.Callback, InputRef.Value)
+        end
+        InputRef.set = InputRef.SetValue
+
         Bxs.Focused:Connect(function()
             TweenService:Create(WrapStroke, Library.TweenInfo, { Color = Library.Scheme.AccentColor }):Play()
         end)
@@ -643,11 +676,11 @@ do
 
         self:Resize()
         table.insert(self.Elements, InputRef)
-        Library.Options[Idx] = InputRef
+        if Idx then Library.Options[Idx] = InputRef end
         return InputRef
     end
 
-    -- ─── Button (new) ────────────────────────────────────────────────────────
+    -- ─── Button ──────────────────────────────────────────────────────────────
     function Class:AddButton(Idx, Info)
         Info = Library:Validate(Info, Templates.Button)
         local hasDesc = Info.Description and Info.Description ~= ""
@@ -661,7 +694,6 @@ do
         New("UICorner", { CornerRadius = UDim.new(0, 5), Parent = Holder })
         local BtnStroke = New("UIStroke", { Color = "OutlineColor", Thickness = 1, Parent = Holder })
 
-        -- Left accent bar
         New("Frame", {
             BackgroundColor3 = "AccentColor",
             Size             = UDim2.new(0, 2, 1, 0),
@@ -702,7 +734,6 @@ do
             TweenService:Create(Holder,    Library.TweenInfo, { BackgroundColor3 = Library.Scheme.SubColor }):Play()
         end)
         Holder.MouseButton1Click:Connect(function()
-            -- brief flash
             TweenService:Create(Holder, Library.TweenInfo, { BackgroundColor3 = Library.Scheme.AccentDim }):Play()
             task.delay(0.12, function()
                 TweenService:Create(Holder, Library.TweenInfo, { BackgroundColor3 = Library.Scheme.SubColor }):Play()
@@ -717,7 +748,7 @@ do
         return BtnObj
     end
 
-    -- ─── Label / Info box (new) ──────────────────────────────────────────────
+    -- ─── Label ───────────────────────────────────────────────────────────────
     function Class:AddLabel(Info)
         if type(Info) == "string" then
             Info = { Text = Info, Description = "" }
@@ -733,14 +764,12 @@ do
         New("UICorner", { CornerRadius = UDim.new(0, 5), Parent = Holder })
         New("UIStroke", { Color = "OutlineColor", Thickness = 1, Parent = Holder })
 
-        -- "i" badge on the left
         local Badge = New("Frame", {
             BackgroundColor3 = "AccentDim",
             Size             = UDim2.new(0, 28, 1, 0),
             Parent           = Holder,
         })
         New("UICorner", { CornerRadius = UDim.new(0, 5), Parent = Badge })
-        -- square off the right corners of badge
         New("Frame", {
             BackgroundColor3 = "AccentDim",
             AnchorPoint      = Vector2.new(1, 0),
@@ -788,10 +817,52 @@ do
 
         local LabelObj = { Type = "Label", _Ref = LabelRef }
         function LabelObj:SetText(txt) LabelRef.Text = tostring(txt):lower() end
+        LabelObj.set = LabelObj.SetText
 
         self:Resize()
         table.insert(self.Elements, LabelObj)
         return LabelObj
+    end
+
+    -- ─── Keybind ─────────────────────────────────────────────────────────────
+    function Class:AddKeybind(Idx, Info)
+        Info = Library:Validate(Info, Templates.Keybind)
+        local Holder = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), Parent = self.Container })
+        New("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(0.5, 0, 1, 0), Text = Info.Text:lower(), TextColor3 = "FontColor", TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, FontFace = "Font", Parent = Holder })
+        
+        local BtnWrap = New("Frame", { BackgroundColor3 = "SubColor", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.new(0, 80, 0, 24), Parent = Holder })
+        New("UICorner", { CornerRadius = UDim.new(0, 5), Parent = BtnWrap })
+        local WrapStroke = New("UIStroke", { Color = "OutlineColor", Thickness = 1, Parent = BtnWrap })
+        
+        local BindBtn = New("TextButton", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Text = Info.Default and Info.Default.Name or "none", TextColor3 = "SecondaryColor", TextSize = 11, FontFace = "Font", Parent = BtnWrap })
+        
+        local KeyObj = { Value = Info.Default, Type = "Keybind" }
+        local connection
+        
+        function KeyObj:SetValue(val)
+            KeyObj.Value = val
+            BindBtn.Text = val and val.Name or "none"
+            Library:SafeCallback(Info.Callback, val)
+        end
+        KeyObj.set = KeyObj.SetValue
+        
+        BindBtn.MouseButton1Click:Connect(function()
+            BindBtn.Text = "..."
+            TweenService:Create(WrapStroke, Library.TweenInfo, { Color = Library.Scheme.AccentColor }):Play()
+            if connection then connection:Disconnect() end
+            connection = UserInputService.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    KeyObj:SetValue(input.KeyCode)
+                    TweenService:Create(WrapStroke, Library.TweenInfo, { Color = Library.Scheme.OutlineColor }):Play()
+                    connection:Disconnect()
+                end
+            end)
+        end)
+        
+        self:Resize()
+        table.insert(self.Elements, KeyObj)
+        if Idx then Library.Options[Idx] = KeyObj end
+        return KeyObj
     end
 
     -- ─── Divider ─────────────────────────────────────────────────────────────
@@ -866,7 +937,6 @@ GBLayout.__index = GBLayout
 --                            Window Engine
 -- ═══════════════════════════════════════════════════════════════════════════
 
-
 function Library:CreateWindow(Info)
     Info = Library:Validate(Info, Templates.Window)
     if Info.Font then Library.Scheme.FontId = Info.Font end
@@ -893,7 +963,6 @@ function Library:CreateWindow(Info)
         Parent           = Window,
     })
     New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = Sidebar })
-    -- Patch right corners square so they don't show rounded edge inside window
     New("Frame", {
         BackgroundColor3 = "SidebarColor",
         AnchorPoint      = Vector2.new(1, 0),
@@ -902,7 +971,6 @@ function Library:CreateWindow(Info)
         BorderSizePixel  = 0,
         Parent           = Sidebar,
     })
-    -- Right-edge 1px separator
     New("Frame", {
         BackgroundColor3 = "OutlineColor",
         AnchorPoint      = Vector2.new(1, 0),
@@ -911,19 +979,16 @@ function Library:CreateWindow(Info)
         Parent           = Sidebar,
     })
 
-    -- Logo / title area (also the drag target)
     local LogoArea = New("Frame", {
         BackgroundTransparency = 1,
         Size   = UDim2.new(1, 0, 0, 54),
         Parent = Sidebar,
     })
-    -- Top accent 1px strip
     New("Frame", {
         BackgroundColor3 = "AccentColor",
         Size             = UDim2.new(1, 0, 0, 1),
         Parent           = LogoArea,
     })
-    -- Bottom separator
     New("Frame", {
         BackgroundColor3 = "OutlineColor",
         AnchorPoint      = Vector2.new(0, 1),
@@ -953,7 +1018,6 @@ function Library:CreateWindow(Info)
 
     Library:MakeDraggable(Window, LogoArea)
 
-    -- Scrollable tab list
     local TabList = New("ScrollingFrame", {
         BackgroundTransparency = 1,
         Position               = UDim2.new(0, 0, 0, 54),
@@ -976,7 +1040,6 @@ function Library:CreateWindow(Info)
         Parent        = TabList,
     })
 
-    -- Sidebar footer (keybind hint)
     local SideFooter = New("Frame", {
         BackgroundTransparency = 1,
         AnchorPoint            = Vector2.new(0, 1),
@@ -1001,7 +1064,6 @@ function Library:CreateWindow(Info)
         Parent         = SideFooter,
     })
 
-    -- ── Content area (right of sidebar) ──────────────────────────────────────
     local Content = New("Frame", {
         BackgroundTransparency = 1,
         Position         = UDim2.new(0, SW + 1, 0, 0),
@@ -1010,12 +1072,20 @@ function Library:CreateWindow(Info)
         Parent           = Window,
     })
 
-    -- ─────────────────────────────────────────────────────────────────────────
     local UIStateObj = { ExtTabs = {} }
+
+    function UIStateObj:SetElementValue(name, val)
+        if Library.Options[name] and Library.Options[name].SetValue then
+            Library.Options[name]:SetValue(val)
+        end
+    end
+
+    function UIStateObj:RefreshMobileList()
+        -- Legacy stub for compatibility with old UI calls
+    end
 
     function UIStateObj:AddTab(LabelT, IconSource)
 
-        -- Pill tab button (in sidebar)
         local TabBtn = New("TextButton", {
             BackgroundColor3     = "SubColor",
             BackgroundTransparency = 1,
@@ -1025,7 +1095,6 @@ function Library:CreateWindow(Info)
         })
         New("UICorner", { CornerRadius = UDim.new(0, 5), Parent = TabBtn })
 
-        -- Animated active bar (left edge of button)
         local ActiveBar = New("Frame", {
             BackgroundColor3 = "AccentColor",
             AnchorPoint      = Vector2.new(0, 0.5),
@@ -1073,7 +1142,6 @@ function Library:CreateWindow(Info)
             Parent         = InnerRow,
         })
 
-        -- Page (scrollable, full content area)
         local Page = New("ScrollingFrame", {
             BackgroundTransparency = 1,
             Size               = UDim2.new(1, 0, 1, 0),
@@ -1146,7 +1214,6 @@ function Library:CreateWindow(Info)
             Library.RefSysTab = { PageInstance = Page, Deselect = deselect }
         end
 
-        -- ── AddGroup ─────────────────────────────────────────────────────────
         function CurCtxt:AddGroup(TitleG, AlignmentID)
             local Col  = AlignmentID == 2 and Rx or Lx
             local Grpx = New("Frame", {
@@ -1157,7 +1224,6 @@ function Library:CreateWindow(Info)
             New("UICorner", { CornerRadius = UDim.new(0, 5), Parent = Grpx })
             New("UIStroke", { Color = "OutlineColor", Thickness = 1, Parent = Grpx })
 
-            -- Flat header: dot + label + separator
             local HeaderArea = New("Frame", {
                 BackgroundTransparency = 1,
                 Size   = UDim2.new(1, 0, 0, 28),
