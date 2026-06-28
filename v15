@@ -1,5 +1,5 @@
 --[[ 
-    MONOLITH FINGERPAINT LIBRARY (V9 - SEDSE AZURE REVAMP)
+    MONOLITH FINGERPAINT LIBRARY (V9 - SEDSE AZURE REVAMP - FIXED AUTOSIZE)
     UI Design: SYNQ Design Scheme — Left Sidebar Layout
     API Engine: Monolith Core (Plug-and-Play)
 ]]
@@ -65,17 +65,17 @@ local rgb = Color3.fromRGB
 local ui_parent = get_ui_parent()
 
 local Theme = {
-    WindowBG = rgb(10, 10, 13),      -- Sedse BackgroundColor
-    SidebarBG = rgb(13, 13, 17),     -- Sedse SidebarColor
-    MainBG = rgb(10, 10, 13),        -- Fallback for API
-    SectionBG = rgb(18, 18, 23),     -- Sedse MainColor
-    ElementBG = rgb(24, 24, 31),     -- Sedse SubColor
-    HoverBG = rgb(30, 30, 40),       -- Sedse hover
-    Accent = rgb(122, 201, 240),     -- Sedse AccentColor (Light Blue)
-    AccentDim = rgb(16, 36, 50),     -- Sedse AccentDim
-    Text = rgb(235, 235, 240),       -- Sedse FontColor
-    MutedText = rgb(115, 115, 132),  -- Sedse SecondaryColor
-    Outline = rgb(30, 30, 40),       -- Sedse OutlineColor
+    WindowBG = rgb(10, 10, 13),      
+    SidebarBG = rgb(13, 13, 17),     
+    MainBG = rgb(10, 10, 13),        
+    SectionBG = rgb(18, 18, 23),     
+    ElementBG = rgb(24, 24, 31),     
+    HoverBG = rgb(30, 30, 40),       
+    Accent = rgb(122, 201, 240),     
+    AccentDim = rgb(16, 36, 50),     
+    Text = rgb(235, 235, 240),       
+    MutedText = rgb(115, 115, 132),  
+    Outline = rgb(30, 30, 40),       
 }
 
 -- Utility Functions
@@ -117,7 +117,6 @@ local notif_container = library:create("Frame", {
 library:create("UIListLayout", {Parent = notif_container, Padding = dim(0, 10), VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right})
 library:create("UIPadding", {Parent = notif_container, PaddingBottom = dim(0, 20), PaddingRight = dim(0, 10)})
 
--- Safe Lazy-Load Lucide Icons
 local Icons
 task.spawn(function()
     pcall(function()
@@ -247,9 +246,15 @@ function library:window(props)
         Parent = main, BackgroundTransparency = 1, Position = dim2(0, SW + 1, 0, 0), Size = dim2(1, -(SW + 1), 1, 0), ClipsDescendants = true
     })
 
-    -- Tiny discreet Min/Close buttons in top right of content area
-    local minBtn = library:create("TextButton", { Parent = main, Size = dim2(0, 20, 0, 20), Position = dim2(1, -44, 0, 4), BackgroundTransparency = 1, Text = "−", TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 14, ZIndex = 50 })
-    local closeBtn = library:create("TextButton", { Parent = main, Size = dim2(0, 20, 0, 20), Position = dim2(1, -22, 0, 4), BackgroundTransparency = 1, Text = "×", TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 14, ZIndex = 50 })
+    -- Min/Close buttons in top right (ZIndex ensures they stay visible)
+    local minBtn = library:create("TextButton", { Parent = main, Size = dim2(0, 24, 0, 24), Position = dim2(1, -54, 0, 6), BackgroundTransparency = 1, Text = "−", TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 16, ZIndex = 50 })
+    local closeBtn = library:create("TextButton", { Parent = main, Size = dim2(0, 24, 0, 24), Position = dim2(1, -28, 0, 6), BackgroundTransparency = 1, Text = "×", TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 16, ZIndex = 50 })
+    
+    closeBtn.MouseEnter:Connect(function() library:tween(closeBtn, {TextColor3 = Theme.Accent}, 0.15) end)
+    closeBtn.MouseLeave:Connect(function() library:tween(closeBtn, {TextColor3 = Theme.MutedText}, 0.15) end)
+    minBtn.MouseEnter:Connect(function() library:tween(minBtn, {TextColor3 = Theme.Accent}, 0.15) end)
+    minBtn.MouseLeave:Connect(function() library:tween(minBtn, {TextColor3 = Theme.MutedText}, 0.15) end)
+    
     closeBtn.MouseButton1Click:Connect(function() screen:Destroy() end)
     
     local resizeHandle = library:create("TextButton", { Parent = main, Size = dim2(0, 20, 0, 20), Position = dim2(1, -20, 1, -20), BackgroundTransparency = 1, Text = "↘", TextColor3 = Theme.MutedText, TextSize = 12, FontFace = library.font, ZIndex = 100 })
@@ -263,7 +268,7 @@ function library:window(props)
         isMinimized = not isMinimized
         if isMinimized then
             savedSize = main.Size; sidebar.Visible = false; page_holder.Visible = false; resizeHandle.Visible = false
-            library:tween(main, {Size = dim2(0, savedSize.X.Offset, 0, 28)}, 0.2)
+            library:tween(main, {Size = dim2(0, savedSize.X.Offset, 0, 36)}, 0.2)
         else
             local t = library:tween(main, {Size = savedSize}, 0.2)
             t.Completed:Connect(function() if not isMinimized then sidebar.Visible = true; page_holder.Visible = true; resizeHandle.Visible = true end end)
@@ -293,12 +298,16 @@ function library:window(props)
         if tIcon then tIcon.Size = dim2(0, 12, 0, 12); tIcon.LayoutOrder = 1; tIcon.Parent = inner end
         local tLabel = library:create("TextLabel", {Parent = inner, BackgroundTransparency = 1, Size = dim2(0, 0, 0, 14), AutomaticSize = Enum.AutomaticSize.X, Text = string.lower(tab.name), TextColor3 = Theme.MutedText, TextSize = 11, FontFace = library.font, LayoutOrder = 2})
 
-        local page = library:create("ScrollingFrame", { Parent = page_holder, BackgroundTransparency = 1, Size = dim2(1, 0, 1, 0), ScrollBarThickness = 2, AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false })
-        library:create("UIPadding", {Parent = page, PaddingTop = dim(0, 14), PaddingBottom = dim(0, 14), PaddingLeft = dim(0, 14), PaddingRight = dim(0, 14)})
+        -- [FIX]: CanvasSize must start at 0 for AutomaticCanvasSize to scale properly
+        local page = library:create("ScrollingFrame", { Parent = page_holder, BackgroundTransparency = 1, Size = dim2(1, 0, 1, 0), CanvasSize = dim2(0,0,0,0), ScrollBarThickness = 2, AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false })
+        -- [FIX]: Increased PaddingTop to 40 so items do not spawn under the minimize/close buttons
+        library:create("UIPadding", {Parent = page, PaddingTop = dim(0, 40), PaddingBottom = dim(0, 14), PaddingLeft = dim(0, 14), PaddingRight = dim(0, 14)})
 
-        local left_col = library:create("Frame", { Parent = page, BackgroundTransparency = 1, Size = dim2(0.5, -7, 1, 0) })
+        -- [FIX]: Size Y changed to 0 and AutomaticSize enabled to prevent overlap
+        local left_col = library:create("Frame", { Parent = page, BackgroundTransparency = 1, Size = dim2(0.5, -7, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
         library:create("UIListLayout", {Parent = left_col, Padding = dim(0, 10)})
-        local right_col = library:create("Frame", { Parent = page, BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = dim2(1, 0, 0, 0), Size = dim2(0.5, -7, 1, 0) })
+        
+        local right_col = library:create("Frame", { Parent = page, BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = dim2(1, 0, 0, 0), Size = dim2(0.5, -7, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
         library:create("UIListLayout", {Parent = right_col, Padding = dim(0, 10)})
 
         if #win.tabs == 0 and not props._noAutoSelect then
@@ -377,7 +386,6 @@ function library:window(props)
             local container = library:create("Frame", { Parent = holder, Size = dim2(1, 0, 0, 0), BackgroundTransparency = 1, Visible = tog.enabled, AutomaticSize = Enum.AutomaticSize.Y })
             library:create("UIListLayout", {Parent = container, Padding = dim(0, 6)}); library:create("UIPadding", {Parent = container, PaddingLeft = dim(0, 14)})
             
-            -- Keybind nested logic
             local bindBtn = library:create("TextButton", { Parent = track, Size = dim2(0, 20, 0, 14), Position = dim2(0, -26, 0.5, -7), BackgroundTransparency = 1, Text = "—", TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 9, AutoButtonColor = false, ZIndex = 2 })
             bindBtn.MouseButton1Click:Connect(function() pickingBind = true; bindBtn.Text = "..."; bindBtn.TextColor3 = Theme.Accent end)
             track_connection(uis.InputBegan:Connect(function(input, gpe)
@@ -506,7 +514,7 @@ function library:window(props)
             local dropWindow = library:create("ScrollingFrame", {
                 Parent = screen, BackgroundColor3 = Theme.SectionBG, Visible = false, Size = dim2(0, 100, 0, 0), ScrollBarThickness = 2, ZIndex = 50
             })
-            table.insert(float_uis, dropWindow) -- Mark for cleanup
+            table.insert(float_uis, dropWindow) 
             library:create("UICorner", {Parent = dropWindow, CornerRadius = dim(0, 6)}); library:create("UIStroke", {Parent = dropWindow, Color = Theme.Outline, Thickness = 1})
             library:create("UIListLayout", {Parent = dropWindow, SortOrder = Enum.SortOrder.LayoutOrder, Padding = dim(0, 2)})
             library:create("UIPadding", {Parent = dropWindow, PaddingTop = dim(0, 6), PaddingBottom = dim(0, 6)})
@@ -710,24 +718,27 @@ function library:window(props)
             return list_api
         end
 
+        -- [FIX]: Sections fully utilize Enum.AutomaticSize.Y to guarantee zero overlapping.
         function tab:Section(props)
             local s = {}
             local parent_col = (string.lower(props.side or "left") == "right") and right_col or left_col
             
-            s.elements = library:create("Frame", { Parent = parent_col, BackgroundColor3 = Theme.SectionBG, Size = dim2(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
-            library:create("UICorner", {Parent = s.elements, CornerRadius = dim(0, 5)}); library:create("UIStroke", {Parent = s.elements, Color = Theme.Outline, Thickness = 1})
+            local box = library:create("Frame", { Parent = parent_col, BackgroundColor3 = Theme.SectionBG, Size = dim2(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
+            library:create("UICorner", {Parent = box, CornerRadius = dim(0, 5)})
+            library:create("UIStroke", {Parent = box, Color = Theme.Outline, Thickness = 1})
+            library:create("UIListLayout", {Parent = box, SortOrder = Enum.SortOrder.LayoutOrder})
             
-            local header = library:create("Frame", {Parent = s.elements, BackgroundTransparency = 1, Size = dim2(1, 0, 0, 28)})
+            local header = library:create("Frame", {Parent = box, BackgroundTransparency = 1, Size = dim2(1, 0, 0, 28), LayoutOrder = 1})
             local hDot = library:create("Frame", {Parent = header, BackgroundColor3 = Theme.Accent, AnchorPoint = Vector2.new(0, 0.5), Position = dim2(0, 12, 0.5, 0), Size = dim2(0, 4, 0, 4)})
             library:create("UICorner", {Parent = hDot, CornerRadius = dim(1, 0)})
             library:create("TextLabel", {Parent = header, BackgroundTransparency = 1, Position = dim2(0, 22, 0, 0), Size = dim2(1, -34, 1, 0), Text = string.lower(props.name or props.Name or "groupbox"), TextColor3 = Theme.MutedText, FontFace = library.font, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left})
             library:create("Frame", {Parent = header, BackgroundColor3 = Theme.Outline, AnchorPoint = Vector2.new(0, 1), Position = dim2(0, 0, 1, 0), Size = dim2(1, 0, 0, 1)})
             
-            local container = library:create("Frame", {Parent = s.elements, BackgroundTransparency = 1, Position = dim2(0, 0, 0, 28), Size = dim2(1, 0, 1, -28), AutomaticSize = Enum.AutomaticSize.Y})
+            local container = library:create("Frame", {Parent = box, BackgroundTransparency = 1, Size = dim2(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2})
             library:create("UIListLayout", {Parent = container, SortOrder = Enum.SortOrder.LayoutOrder, Padding = dim(0, 8)})
             library:create("UIPadding", {Parent = container, PaddingTop = dim(0, 10), PaddingBottom = dim(0, 12), PaddingLeft = dim(0, 12), PaddingRight = dim(0, 12)})
 
-            s.elements = container -- Reroute elements to correct container
+            s.elements = container
             setmetatable(s, { __index = section_api })
             return s
         end
@@ -843,4 +854,4 @@ function library:create_notification(props)
     end)
 end
 
-return library 
+return library
