@@ -41,7 +41,7 @@ local Library = {
         FontColor       = Color3.fromRGB(235, 235, 240),
         SecondaryColor  = Color3.fromRGB(115, 115, 132),
         DimColor        = Color3.fromRGB(65, 65, 82),
-        FontId          = Enum.Font.RobotoMono,
+        FontId          = Font.new("rbxassetid://12187375716", Enum.FontWeight.Regular, Enum.FontStyle.Normal), 
         RedColor        = Color3.fromRGB(240, 60, 60),
     },
 }
@@ -100,7 +100,7 @@ local function FillInstance(Table, Inst)
             value           = Library.Scheme[value]
         end
         if key == "FontFace" and value == "Font" then
-            value = Font.fromEnum(Library.Scheme.FontId)
+            value = Library.Scheme.FontId
         end
         pcall(function() Inst[key] = value end)
     end
@@ -866,10 +866,11 @@ GBLayout.__index = GBLayout
 --                            Window Engine
 -- ═══════════════════════════════════════════════════════════════════════════
 
+
 function Library:CreateWindow(Info)
     Info = Library:Validate(Info, Templates.Window)
-    if typeof(Info.Font) == "EnumItem" then Library.Scheme.FontId = Info.Font end
-
+    if Info.Font then Library.Scheme.FontId = Info.Font end
+    
     local SW     = Library.SidebarWidth
     local center = UDim2.new(0.5, -Info.Size.X.Offset / 2, 0.5, -Info.Size.Y.Offset / 2)
 
